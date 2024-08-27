@@ -1,0 +1,213 @@
+.kanban-board {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  min-width: 70rem;
+}
+
+.kanban-column {
+  flex: 1;
+  background-color: #f4f4f4;
+  padding: 1rem;
+  border-radius: 8px;
+  transition: background-color 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.kanban-column.active {
+  background-color: #e0e0e0;
+  transform: scale(1.02);
+}
+
+.column-title {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 4rem;
+  border-radius: 1rem;
+  width: fit-content;
+  font-weight: 600;
+}
+
+.column-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card {
+  background-color: white;
+  padding: 0.5rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.card-info {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.card:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.add-card {
+  background-color: rgba(130, 114, 180, 1);
+  color: white;
+  padding: 1rem;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+}
+.add-card span {
+  font-size: large;
+}
+
+.add-card:hover {
+  background-color: #d0d0d0;
+  transform: scale(1.05);
+}
+
+.add-card-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.add-card-form textarea {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: rgba(130, 114, 180, 0.2);
+  padding: 0.5rem;
+  resize: none;
+  outline: none;
+}
+
+.add-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+}
+
+.close-btn {
+  cursor: pointer;
+  color: #888;
+  border-radius: 4px;
+  font-size: 16px;
+  padding: 0.5rem;
+  transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.submit-btn {
+  display: flex;
+  align-items: center;
+  background-color: rgba(130, 114, 180, 1);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem;
+  cursor: pointer;
+  font-size: 16px;
+  justify-content: center;
+  transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.submit-btn:hover {
+  background-color: rgba(130, 114, 180, 1);
+  transform: scale(1.05);
+}
+
+.burn-barrel {
+  width: 50px;
+  height: 50px;
+  background-color: #f44336;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out;
+}
+
+.burn-barrel.active {
+  transform: scale(1.2);
+  background-color: #d32f2f;
+}
+
+.burn-barrel svg {
+  color: white;
+  font-size: 1.5rem;
+}
+
+.drop-indicator {
+  margin-top: 0.125rem;
+  margin-bottom: 0.125rem;
+  height: 0.125rem;
+  width: 100%;
+  background-color: #7c3aed;
+  opacity: 0;
+}
+.icons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+.icons svg {
+  cursor: pointer;
+}
+.counter {
+  color: rgba(35, 35, 87, 0.6);
+  font-weight: 600;
+  font-size: 16px;
+}
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+}
+.card-actions svg {
+  cursor: pointer;
+}
+
+.card-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: #f7fafc;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #a0aec0;
+}
+
+.card-edit input {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #a0aec0;
+  background-color: #f7fafc;
+  font-size: 16px;
+  outline: none;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.card-edit input:focus {
+  border-color: #9f7aea;
+  box-shadow: 0 0 0 2px rgba(159, 122, 234, 0.2);
+}

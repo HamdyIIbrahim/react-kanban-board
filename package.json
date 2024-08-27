@@ -1,0 +1,51 @@
+{
+  "name": "react-custom-kanban-board",
+  "version": "1.0.0",
+  "description": "A customizable Kanban board component for React.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc && npm run build:css",
+    "build:css": "postcss src/KanbanBoard.css -o dist/KanbanBoard.css",
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "framer-motion": "^11.3.30",
+    "react": "^16.* || ^17.* || ^18.*",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.21",
+    "postcss-cli": "^10.1.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": "^16.* || ^17.* || ^18.*",
+    "react-dom": "^18.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "keywords": [
+    "kanban-board",
+    "react-kanban-board",
+    "react-kanban",
+    "kanban",
+    "component",
+    "react"
+  ],
+  "author": "Hamdy Ibrahim",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HamdyIIbrahim/react-kanban-board"
+  },
+  "homepage": "https://github.com/HamdyIIbrahim/react-kanban-board#readme"
+}
