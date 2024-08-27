@@ -2,7 +2,10 @@
   "compilerOptions": {
     "target": "ES5",
     "module": "commonjs",
-    "lib": ["DOM", "ESNext"],
+    "lib": [
+      "DOM",
+      "ESNext"
+    ],
     "jsx": "react-jsx",
     "declaration": true,
     "outDir": "./dist",
@@ -11,8 +14,14 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-  "rootDir": "./src"
+    "rootDir": "./src"
   },
- "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*",
+    "replacePaths.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

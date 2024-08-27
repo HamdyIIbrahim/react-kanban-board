@@ -8,10 +8,10 @@ Here are some visual examples of the Kanban board component:
 
 - ![Example 1](./public/assets/images/kanban1.png)
 - ![Example 2](./public/assets/images/kanban2.png)
-- ![Example 3](./public/assets/images/kanban3.png)
-- ![Example 4](./public/assets/images/kanban4.png)
-- ![Example 5](./public/assets/images/kanban5.png)
-- ![Example 6](./public/assets/images/kanban6.png)
+- ![Example 3](./public/assets/images/kanban4.png)
+- ![Example 4](./public/assets/images/kanban5.png)
+- ![Example 5](./public/assets/images/kanban6.png)
+- ![Example 6](./public/assets/images/kanban3.png)
 
 ## Features
 
@@ -42,26 +42,26 @@ yarn add react-custom-kanban-board
 import React from 'react';
 import KanbanBoard from 'react-custom-kanban-board';
 
-const columns = [
-  { title: "To Do", key: "todo", color: "#f0ad4e" },
-  { title: "In Progress", key: "in-progress", color: "#5bc0de" },
-  { title: "Done", key: "done", color: "#5cb85c" },
-];
+const columns: Column[] = [
+    { title: "To Do", key: "todo", color: "#BDBDCD" },
+    { title: "In Progress", key: "in-progress", color: "#FDDDE3" },
+    { title: "Done", key: "done", color: "#71C781" },
+  ];
 
-const initialCards = [
-  {
-    id: "1",
-    title: "Task 1",
-    status: "todo",
-    avatarPath: "https://i.pravatar.cc/40?img=1",
-  },
-  {
-    id: "2",
-    title: "Task 2",
-    status: "in-progress",
-    avatarPath: "https://i.pravatar.cc/40?img=2",
-  },
-];
+const initialCards: Card[] = [
+    {
+      id: "1",
+      title: "Task 1",
+      status: "todo",
+      avatarPath: "https://i.pravatar.cc/40?img=1",
+    },
+    {
+      id: "2",
+      title: "Task 2",
+      status: "in-progress",
+      avatarPath: "https://i.pravatar.cc/40?img=2",
+    },
+  ];
 
 const App = () => {
   return (
@@ -86,13 +86,13 @@ export default App;
 import React from 'react';
 import KanbanBoard, { Card, Column } from 'react-custom-kanban-board';
 
-const columns = [
+const columns : Column[] = [
   { title: "To Do", key: "todo", color: "#f0ad4e" },
   { title: "In Progress", key: "in-progress", color: "#5bc0de" },
   { title: "Done", key: "done", color: "#5cb85c" },
 ];
 
-const initialCards = [
+const initialCards : Card[] = [
   {
     id: "1",
     title: "Task 1",
