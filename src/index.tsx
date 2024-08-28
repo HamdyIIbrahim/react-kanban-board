@@ -1,4 +1,4 @@
-import { useState, DragEvent, ReactNode } from "react";
+import { useState, DragEvent, ReactNode, useEffect } from "react";
 import { motion } from "framer-motion";
 import "./KanbanBoard.css";
 
@@ -145,8 +145,6 @@ const EditIcon = () => {
   );
 };
 
-
-
 const KanbanBoard = ({
   columns,
   columnForAddCard,
@@ -160,7 +158,9 @@ const KanbanBoard = ({
   renderAddCard,
 }: KanbanBoardProps) => {
   const [cards, setCards] = useState<Card[]>(initialCards);
-
+  useEffect(() => {
+    setCards(initialCards);
+  }, [initialCards]);
   return (
     <div className="kanban-board">
       {columns.map((column) => (
@@ -348,10 +348,10 @@ const ColumnComponent: React.FC<ColumnProps> = ({
                 {renderCard(card, handleDragStart)}
                 <div className="card-actions">
                   <div onClick={() => handleEditClick(card.id, card.title)}>
-                    <EditIcon  />
+                    <EditIcon />
                   </div>
                   <div onClick={() => handleDeleteCard(card.id)}>
-                    <DeleteIcon  />
+                    <DeleteIcon />
                   </div>
                 </div>
               </>
@@ -364,10 +364,10 @@ const ColumnComponent: React.FC<ColumnProps> = ({
                 {" "}
                 <div className="card-actions">
                   <div onClick={() => handleEditClick(card.id, card.title)}>
-                    <EditIcon  />
+                    <EditIcon />
                   </div>
                   <div onClick={() => handleDeleteCard(card.id)}>
-                    <DeleteIcon  />
+                    <DeleteIcon />
                   </div>
                 </div>
               </DefaultCard>
