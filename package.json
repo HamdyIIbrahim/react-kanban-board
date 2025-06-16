@@ -1,9 +1,11 @@
 {
   "name": "react-custom-kanban-board",
   "version": "1.0.2",
-  "description": "A customizable Kanban board component for React.",
+  "description": "A customizable Kanban board component for React with advanced features like search, filtering, and WIP limits.",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "sideEffects": false,
   "scripts": {
     "clean": "rimraf dist",
     "build": "npm run clean && tsc && npm run build:css",
@@ -13,21 +15,26 @@
   },
   "dependencies": {
     "framer-motion": "^11.3.30",
-    "react": "^16.* || ^17.* || ^18.*",
-    "react-dom": "^18.0.0"
+    "react": "^16.* || ^17.* || ^18.* || ^19.*",
+    "react-dom": "^16.* || ^17.* || ^18.* || ^19.*"
   },
   "devDependencies": {
-    "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
+    "@types/react": "^16.* || ^17.* || ^18.* || ^19.*",
+    "@types/react-dom": "^16.* || ^17.* || ^18.* || ^19.*",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.21",
     "postcss-cli": "^10.1.0",
     "rimraf": "^5.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^4.9.0 || ^5.0.0"
   },
   "peerDependencies": {
-    "react": "^16.* || ^17.* || ^18.*",
-    "react-dom": "^18.0.0"
+    "react": "^16.* || ^17.* || ^18.* || ^19.*",
+    "react-dom": "^16.* || ^17.* || ^18.* || ^19.*"
+  },
+  "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    }
   },
   "files": [
     "dist/**/*",
@@ -39,7 +46,10 @@
     "react-kanban",
     "kanban",
     "component",
-    "react"
+    "react",
+    "drag-and-drop",
+    "task-management",
+    "project-management"
   ],
   "author": "Hamdy Ibrahim",
   "license": "MIT",
@@ -47,5 +57,13 @@
     "type": "git",
     "url": "https://github.com/HamdyIIbrahim/react-kanban-board"
   },
-  "homepage": "https://github.com/HamdyIIbrahim/react-kanban-board#readme"
+  "homepage": "https://github.com/HamdyIIbrahim/react-kanban-board#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browser": {
+    "fs": false,
+    "path": false,
+    "os": false
+  }
 }
