@@ -1,4 +1,5 @@
 :root {
+  --board-bg: #f5f6f8;
   --column-bg: #f8f9fa;
   --card-bg: #ffffff;
   --text-color: #1a1a1a;
@@ -10,7 +11,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  background-color: #f5f6f8;
+  background-color: var(--board-bg);
   min-height: 300px;
   border-radius: var(--border-radius);
 }
@@ -261,94 +262,165 @@
 .card {
   background: var(--card-bg);
   border-radius: 10px;
-  padding: 1.25rem 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  padding: 1.25rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
   cursor: grab;
-  border: 1px solid #e3e8ee;
+  border: 1px solid #e0e0e0;
   font-size: 1rem;
   position: relative;
-  min-height: 60px;
-  will-change: transform;
 }
 
 .card:active {
   cursor: grabbing;
 }
 
-.card-info {
+/* Card Header */
+.card-header {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
 }
 
-.card-info p {
+.card-title {
+  font-size: 0.95rem;
   margin: 0;
+  padding-right: 4rem; /* Space for action buttons */
+  font-weight: 500;
+  word-break: break-word;
   color: var(--text-color);
-  font-size: 0.9375rem;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
+/* Card Actions */
+.card-actions {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  gap: 0.4rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 5;
+}
+
+.card:hover .card-actions,
+.card:focus .card-actions,
+.card:focus-within .card-actions {
+  opacity: 1;
+}
+
+.card-action-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.card-action-button:hover {
+  background-color: #f9fafb;
+}
+
+.card-action-button.edit:hover {
+  color: var(--accent-color);
+}
+
+.card-action-button.delete:hover {
+  color: #ef4444;
+}
+
+/* Priority badge */
+.priority-badge-container {
+  margin-bottom: 0.75rem;
+}
+
+.priority-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.priority-badge.high {
+  background-color: #FEE2E2;
+  color: #DC2626;
+}
+
+.priority-badge.medium {
+  background-color: #FEF3C7;
+  color: #D97706;
+}
+
+.priority-badge.low {
+  background-color: #D1FAE5;
+  color: #059669;
+}
+
+/* Card details styling */
 .card-details {
   margin-top: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-size: 0.875rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f3f4f6;
+  overflow: hidden;
+}
+
+.card-description p {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+  line-height: 1.4;
 }
 
 .card-detail {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  align-items: baseline;
 }
 
 .detail-label {
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.priority-badge {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
   font-weight: 600;
+  color: #6b7280;
+  margin-right: 0.5rem;
 }
 
-.priority-badge.high {
-  background-color: #FFEBEE;
-  color: #D32F2F;
+.detail-value {
+  color: #374151;
 }
 
-.priority-badge.medium {
-  background-color: #FFF8E1;
-  color: #FFA000;
+/* Tag styling */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
 }
 
-.priority-badge.low {
-  background-color: #E8F5E9;
-  color: #388E3C;
+.card-tag {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border-radius: 12px;
 }
 
-.due-date {
-  color: #333;
-  font-weight: 500;
-}
-
-.card-description p {
-  color: #4a5568;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  margin: 0.5rem 0 0;
-}
-
+/* Updated card footer */
 .card-footer {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   margin-top: 1rem;
 }
 
+/* Avatar */
 .avatar-container {
   display: flex;
   align-items: center;
@@ -363,73 +435,23 @@
   object-fit: cover;
 }
 
+/* Expand toggle button */
 .expand-toggle {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 0.875rem;
-  padding: 0.25rem 0.5rem;
-  color: #666;
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  padding: 0.25rem;
+  border-radius: 50%;
   transition: all 0.2s;
 }
 
 .expand-toggle:hover {
-  background: #f0f0f0;
-  color: #333;
-}
-
-.card-highlight {
-  animation: cardHighlight 1s ease;
-}
-
-@keyframes cardHighlight {
-  0% { box-shadow: 0 0 0 2px var(--accent-color); }
-  50% { box-shadow: 0 0 0 4px var(--accent-color); }
-  100% { box-shadow: 0 2px 8px rgba(34, 139, 230, 0.08); }
-}
-
-/* Fix card actions visibility */
-.card-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  opacity: 1; /* Always visible instead of hidden */
-  transition: all 0.2s ease;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 4px;
-  padding: 0.25rem;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-/* Remove hover-only visibility */
-.card:hover .card-actions,
-.card:focus .card-actions,
-.card:focus-within .card-actions {
-  opacity: 1;
-}
-
-.card-actions div {
-  cursor: pointer;
-  padding: 0.3em 0.5em;
-  border-radius: 6px;
-  transition: background 0.2s;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card-actions div:hover {
-  background: #f0f4fa;
-}
-
-.card-actions div:focus {
-  outline: 2px solid var(--accent-color);
-  outline-offset: 2px;
+  background-color: #f3f4f6;
+  color: #374151;
 }
 
 .card-edit {
@@ -528,14 +550,14 @@
 }
 
 .add-card-buttons button:first-child {
-  background-color: #3498db; /* Fixed accent color */
+  background-color: var(--accent-color);
   color: white;
   flex: 1;
   font-weight: 600;
 }
 
 .add-card-buttons button:first-child:hover:not(:disabled) {
-  background-color: #1c7ed6;
+  filter: brightness(1.1);
 }
 
 .add-card-buttons button:first-child:disabled {
@@ -555,15 +577,13 @@
 /* Drop indicator */
 .drop-indicator {
   height: 3px;
-  background-color: #3498db;
+  width: 100%;
+  background-color: var(--accent-color);
   margin: 0.5rem 0;
   border-radius: 3px;
   opacity: 0;
   transition: all 0.2s ease;
-}
-
-.drop-indicator.active {
-  opacity: 1;
+  pointer-events: none;
 }
 
 /* Drag preview */
@@ -572,53 +592,19 @@
   z-index: 1000;
   pointer-events: none;
   background: white;
+  padding: 0.75rem;
   border-radius: 10px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   opacity: 0.9;
+  max-width: 260px;
   transform: rotate(2deg);
-}
-
-/* Enhanced drag animation styles */
-.card-dragging {
-  opacity: 0.5;
-  transform: scale(1.03);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  background-color: #f8f9fa;
-  border: 2px dashed var(--accent-color);
-}
-
-/* Card drop animation */
-@keyframes cardDropIn {
-  0% {
-    transform: translateY(-10px) scale(1.05);
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
-    opacity: 0.9;
-  }
-  50% {
-    transform: translateY(5px) scale(1.02);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    opacity: 1;
-  }
-}
-
-.card-highlight {
-  animation: cardDropIn 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-  border: 2px solid var(--accent-color);
-  background-color: #f0f8ff;
-}
-
-/* Smooth card appearance animation */
-.column-content > div {
-  transition: transform 0.2s ease, opacity 0.2s ease;
-}
-
-/* Improve card motion transitions */
-.card {
-  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
-  will-change: transform, opacity, box-shadow;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  border-left: 4px solid var(--accent-color);
 }
 
 /* Custom scrollbar */

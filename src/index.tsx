@@ -45,6 +45,8 @@ interface DefaultCardProps {
   children?: ReactNode;
   isExpanded?: boolean;
   toggleExpand?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
 interface KanbanBoardProps {
@@ -69,6 +71,7 @@ interface KanbanBoardProps {
   theme?: {
     backgroundColor?: string;
     columnBackgroundColor?: string;
+    columnHeaderColor?: { [key: string]: string } | string;
     cardBackgroundColor?: string;
     textColor?: string;
     accentColor?: string;
@@ -106,6 +109,7 @@ interface ColumnProps {
   ) => ReactNode;
   emptyColumnMessage?: string;
   filteredCards: Card[];
+  theme?: KanbanBoardProps["theme"];
 }
 
 interface AddCardProps {
@@ -114,48 +118,28 @@ interface AddCardProps {
   onTaskAddedCallback?: (title: string) => void;
 }
 
+// Enhanced Icon Components
 const DeleteIcon = () => {
   return (
     <svg
-      width="23"
-      height="23"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
       <path
-        d="M10 11V17"
-        stroke="#F11D42"
-        strokeWidth="2"
+        d="M19.5 5.5L18.8803 15.5251C18.7219 18.0864 18.6428 19.3671 18.0008 20.2879C17.6833 20.7431 17.2747 21.1273 16.8007 21.416C15.8421 22 14.559 22 12 22C9.44098 22 8.15402 22 7.19926 21.4159C6.72521 21.1271 6.31729 20.743 6.00058 20.2879C5.35858 19.3671 5.27812 18.0863 5.11963 15.525L4.5 5.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M14 11V17"
-        stroke="#F11D42"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4 7H20"
-        stroke="#F11D42"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6 7H12H18V18C18 19.6569 16.6569 21 15 21H9C7.34315 21 6 19.6569 6 18V7Z"
-        stroke="#F11D42"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5V7H9V5Z"
-        stroke="#F11D42"
-        strokeWidth="2"
+        d="M3 5.5H21M16.0557 5.5L15.3731 4.09173C14.9196 3.15626 14.6928 2.68852 14.3017 2.39681C14.215 2.3321 14.1231 2.27454 14.027 2.2247C13.5939 2 13.0741 2 12.0345 2C10.9688 2 10.436 2 9.99568 2.23412C9.89809 2.28601 9.80498 2.3459 9.71729 2.41317C9.32163 2.7167 9.10062 3.20155 8.6586 4.17126L8.05292 5.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -166,24 +150,26 @@ const DeleteIcon = () => {
 const EditIcon = () => {
   return (
     <svg
-      width="20"
-      height="20"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
       <path
-        d="M21.2799 6.40005L11.7399 15.94C10.7899 16.89 7.96987 17.33 7.33987 16.7C6.70987 16.07 7.13987 13.25 8.08987 12.3L17.6399 2.75002C17.8754 2.49308 18.1605 2.28654 18.4781 2.14284C18.7956 1.99914 19.139 1.92124 19.4875 1.9139C19.8359 1.90657 20.1823 1.96991 20.5056 2.10012C20.8289 2.23033 21.1225 2.42473 21.3686 2.67153C21.6147 2.91833 21.8083 3.21243 21.9376 3.53609C22.0669 3.85976 22.1294 4.20626 22.1211 4.55471C22.1128 4.90316 22.0339 5.24635 21.8894 5.5635C21.7448 5.88065 21.5375 6.16524 21.2799 6.40005V6.40005Z"
-        stroke="#000000"
-        strokeWidth="1.5"
+        d="M14.2454 5.05L15.9954 3.3C16.3954 2.9 16.9954 2.9 17.3954 3.3L20.6954 6.6C21.0954 7 21.0954 7.6 20.6954 8L8.69543 20C8.49543 20.2 8.19543 20.3 7.99543 20.3L3.69543 21L4.39543 16.7C4.39543 16.5 4.49543 16.2 4.69543 16L14.2454 5.05Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeMiterlimit="10"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M11 4H6C4.93913 4 3.92178 4.42142 3.17163 5.17157C2.42149 5.92172 2 6.93913 2 8V18C2 19.0609 2.42149 20.0783 3.17163 20.8284C3.92178 21.5786 4.93913 22 6 22H17C19.21 22 20 20.2 20 18V13"
-        stroke="#000000"
-        strokeWidth="1.5"
+        d="M12.2954 7L17.2954 12"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeMiterlimit="10"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -203,15 +189,41 @@ const SearchIcon = () => {
     >
       <path
         d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z"
-        stroke="#000000"
+        stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
         d="M21 21L16.65 16.65"
-        stroke="#000000"
+        stroke="currentColor"
         strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+};
+
+// New collapse/expand icon with animation
+const CollapseExpandIcon = ({ isExpanded }: { isExpanded?: boolean }) => {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{
+        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform 0.3s ease",
+      }}
+      aria-hidden="true"
+    >
+      <path
+        d="M7 10L12 15L17 10"
+        stroke="currentColor"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -253,6 +265,34 @@ const KanbanBoard = ({
   const [filteredCards, setFilteredCards] = useState<Card[]>(initialCards);
 
   const boardRef = useRef<HTMLDivElement>(null);
+
+  // Apply theme variables for dynamic theming
+  useEffect(() => {
+    const root = document.documentElement;
+
+    if (theme.backgroundColor)
+      root.style.setProperty("--board-bg", theme.backgroundColor);
+    if (theme.columnBackgroundColor)
+      root.style.setProperty("--column-bg", theme.columnBackgroundColor);
+    if (theme.cardBackgroundColor)
+      root.style.setProperty("--card-bg", theme.cardBackgroundColor);
+    if (theme.textColor)
+      root.style.setProperty("--text-color", theme.textColor);
+    if (theme.accentColor)
+      root.style.setProperty("--accent-color", theme.accentColor);
+    if (theme.borderRadius)
+      root.style.setProperty("--border-radius", theme.borderRadius);
+
+    // Clean up when component unmounts
+    return () => {
+      root.style.removeProperty("--board-bg");
+      root.style.removeProperty("--column-bg");
+      root.style.removeProperty("--card-bg");
+      root.style.removeProperty("--text-color");
+      root.style.removeProperty("--accent-color");
+      root.style.removeProperty("--border-radius");
+    };
+  }, [theme]);
 
   useEffect(() => {
     setCards(initialCards);
@@ -364,6 +404,7 @@ const KanbanBoard = ({
             onTaskAddedCallback={onTaskAddedCallback}
             columnForAddCard={columnForAddCard}
             emptyColumnMessage={emptyColumnMessage}
+            theme={theme}
           />
         ))}
       </div>
@@ -388,6 +429,7 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   renderAddCard,
   onTaskAddedCallback,
   emptyColumnMessage,
+  theme,
 }) => {
   const [active, setActive] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -398,6 +440,15 @@ const ColumnComponent: React.FC<ColumnProps> = ({
 
   const columnRef = useRef<HTMLDivElement>(null);
   const isLimitExceeded = limit !== undefined && filteredCards.length > limit;
+
+  // Get column header style based on theme - for dynamic column header colors
+  const columnStyle = {
+    backgroundColor:
+      typeof theme?.columnHeaderColor === "object" &&
+      theme.columnHeaderColor[column]
+        ? theme.columnHeaderColor[column]
+        : color,
+  };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>, card: Card) => {
     e.dataTransfer.setData("cardId", card.id);
@@ -422,20 +473,27 @@ const ColumnComponent: React.FC<ColumnProps> = ({
     setExpandedCards((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // Fixed handleDragEnd function for proper card reordering
   const handleDragEnd = (e: DragEvent<HTMLDivElement>) => {
     const cardId = e.dataTransfer.getData("cardId");
 
     setActive(false);
     clearHighlights();
 
+    // Get all drop indicators in the current column
     const indicators = getIndicators();
+
+    // Find the nearest indicator based on mouse position
     const { element } = getNearestIndicator(e, indicators);
 
+    // Get the ID of the card before which to insert the dragged card
     const before = element.dataset.before || "-1";
 
+    // Only proceed if we're not trying to place the card in its original position
     if (before !== cardId) {
       let copy = [...cards];
 
+      // Find the card being dragged
       let cardToTransfer = copy.find((c) => c.id === cardId);
       if (!cardToTransfer) return;
 
@@ -453,21 +511,28 @@ const ColumnComponent: React.FC<ColumnProps> = ({
         }
       }
 
+      // Update the card's status to the new column
       cardToTransfer = { ...cardToTransfer, status: column };
 
+      // Remove the card from its original position
       copy = copy.filter((c) => c.id !== cardId);
 
+      // Determine if we're adding the card to the end of the column
       const moveToBack = before === "-1";
 
       if (moveToBack) {
+        // Add the card to the end of the array
         copy.push(cardToTransfer);
       } else {
+        // Find the index where to insert the card
         const insertAtIndex = copy.findIndex((el) => el.id === before);
-        if (insertAtIndex === undefined) return;
+        if (insertAtIndex === -1) return; // Invalid index
 
+        // Insert the card at the proper position
         copy.splice(insertAtIndex, 0, cardToTransfer);
       }
 
+      // Update state and trigger callback
       setCards(copy);
       onCardMove?.(cardId, column);
     }
@@ -516,15 +581,20 @@ const ColumnComponent: React.FC<ColumnProps> = ({
     el.element.style.opacity = "1";
   };
 
+  // Improved getNearestIndicator for better accuracy in finding drop targets
   const getNearestIndicator = (
     e: DragEvent<HTMLDivElement>,
     indicators: HTMLElement[]
   ) => {
     const DISTANCE_OFFSET = 50;
+
+    // Calculate the position of each indicator relative to mouse
     const el = indicators.reduce(
       (closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = e.clientY - (box.top + DISTANCE_OFFSET);
+
+        // If this indicator is closer to the mouse than our current closest
         if (offset < 0 && offset > closest.offset) {
           return { offset: offset, element: child };
         } else {
@@ -594,7 +664,7 @@ const ColumnComponent: React.FC<ColumnProps> = ({
       ref={columnRef}
       data-testid={`column-${column}`}
     >
-      <div className="column-title" style={{ backgroundColor: color }}>
+      <div className="column-title" style={columnStyle}>
         <div className="column-title-text">{title}</div>
         <div className="column-counter-container">
           <span className={`counter ${isLimitExceeded ? "exceeded" : ""}`}>
@@ -632,34 +702,12 @@ const ColumnComponent: React.FC<ColumnProps> = ({
                     />
                   </div>
                 ) : renderCard ? (
-                  <div className="card-wrapper">
-                    {renderCard(
-                      card,
-                      handleDragStart,
-                      expandedCards[card.id],
-                      toggleExpand
-                    )}
-                    <div className="card-actions" aria-label="Card actions">
-                      <div
-                        onClick={() => handleEditClick(card.id, card.title)}
-                        title="Edit card"
-                        role="button"
-                        tabIndex={0}
-                        aria-label="Edit card"
-                      >
-                        <EditIcon />
-                      </div>
-                      <div
-                        onClick={() => handleDeleteCard(card.id)}
-                        title="Delete card"
-                        role="button"
-                        tabIndex={0}
-                        aria-label="Delete card"
-                      >
-                        <DeleteIcon />
-                      </div>
-                    </div>
-                  </div>
+                  renderCard(
+                    card,
+                    handleDragStart,
+                    expandedCards[card.id],
+                    toggleExpand
+                  )
                 ) : (
                   <DefaultCard
                     {...card}
@@ -667,28 +715,9 @@ const ColumnComponent: React.FC<ColumnProps> = ({
                     renderAvatar={renderAvatar}
                     isExpanded={expandedCards[card.id]}
                     toggleExpand={() => toggleExpand(card.id)}
-                  >
-                    <div className="card-actions">
-                      <div
-                        onClick={() => handleEditClick(card.id, card.title)}
-                        title="Edit card"
-                        role="button"
-                        tabIndex={0}
-                        aria-label="Edit card"
-                      >
-                        <EditIcon />
-                      </div>
-                      <div
-                        onClick={() => handleDeleteCard(card.id)}
-                        title="Delete card"
-                        role="button"
-                        tabIndex={0}
-                        aria-label="Delete card"
-                      >
-                        <DeleteIcon />
-                      </div>
-                    </div>
-                  </DefaultCard>
+                    onDelete={() => handleDeleteCard(card.id)}
+                    onEdit={() => handleEditClick(card.id, card.title)}
+                  />
                 )}
               </motion.div>
             ))}
@@ -711,6 +740,7 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   );
 };
 
+// Enhanced default card with better styling and icon positioning
 const DefaultCard = ({
   title,
   avatarPath,
@@ -718,14 +748,27 @@ const DefaultCard = ({
   status,
   priority,
   dueDate,
+  tags,
   description,
   handleDragStart,
   renderAvatar,
-  children,
   isExpanded,
   toggleExpand,
+  onDelete,
+  onEdit,
 }: DefaultCardProps) => {
-  const hasDetails = priority || dueDate || description;
+  const hasDetails =
+    priority || dueDate || description || (tags && tags.length > 0);
+
+  // Priority color mapping
+  const priorityColors = {
+    High: "#F87171",
+    Medium: "#FBBF24",
+    Low: "#34D399",
+  };
+
+  // Get border color based on priority
+  const borderColor = priority ? priorityColors[priority] : undefined;
 
   return (
     <motion.div
@@ -734,11 +777,18 @@ const DefaultCard = ({
       className={`card ${isExpanded ? "expanded" : ""}`}
       draggable
       onDragStart={(e) => handleDragStart(e, { title, id, status })}
-      whileHover={{
-        y: -4,
-        boxShadow: "0 6px 16px rgba(34, 139, 230, 0.18)",
+      style={{
+        borderLeft: borderColor ? `4px solid ${borderColor}` : undefined,
       }}
-      transition={{ type: "spring", stiffness: 300 }}
+      whileHover={{
+        y: -2,
+        boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08)",
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 400,
+        damping: 17,
+      }}
       tabIndex={0}
       role="article"
       aria-label={`Card: ${title}`}
@@ -748,59 +798,94 @@ const DefaultCard = ({
         }
       }}
     >
-      <div className="card-info">
-        <p>
+      <div className="card-header">
+        <h3 className="card-title">
           {isExpanded || title.length <= 100
             ? title
             : `${title.substring(0, 100)}...`}
-        </p>
+        </h3>
 
-        {/* Standardized avatar position */}
-        <div className="card-footer">
-          {renderAvatar
-            ? renderAvatar(avatarPath)
-            : avatarPath && <DefaultAvatar avatarPath={avatarPath} />}
-
-          {hasDetails && toggleExpand && (
+        <div className="card-actions">
+          {onEdit && (
             <button
-              onClick={() => toggleExpand(id)}
-              className="expand-toggle"
-              aria-label={isExpanded ? "Collapse card" : "Expand card"}
+              className="card-action-button edit"
+              onClick={() => onEdit(id)}
+              aria-label="Edit card"
+              type="button"
             >
-              {isExpanded ? "▲" : "▼"}
+              <EditIcon />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              className="card-action-button delete"
+              onClick={() => onDelete(id)}
+              aria-label="Delete card"
+              type="button"
+            >
+              <DeleteIcon />
             </button>
           )}
         </div>
+      </div>
 
-        {/* Card details moved below avatar for consistency */}
-        {hasDetails && isExpanded && (
-          <div className="card-details">
-            {priority && (
-              <div className="card-detail">
-                <span className="detail-label">Priority:</span>
-                <span className={`priority-badge ${priority.toLowerCase()}`}>
-                  {priority}
+      {priority && (
+        <div className="priority-badge-container">
+          <span className={`priority-badge ${priority.toLowerCase()}`}>
+            {priority}
+          </span>
+        </div>
+      )}
+
+      {isExpanded && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3 }}
+          className="card-details"
+        >
+          {description && (
+            <div className="card-description">
+              <p>{description}</p>
+            </div>
+          )}
+
+          {dueDate && (
+            <div className="card-detail">
+              <span className="detail-label">Due:</span>
+              <span className="detail-value">{dueDate}</span>
+            </div>
+          )}
+
+          {tags && tags.length > 0 && (
+            <div className="card-tags">
+              {tags.map((tag) => (
+                <span key={tag} className="card-tag">
+                  {tag}
                 </span>
-              </div>
-            )}
+              ))}
+            </div>
+          )}
+        </motion.div>
+      )}
 
-            {dueDate && (
-              <div className="card-detail">
-                <span className="detail-label">Due:</span>
-                <span className="due-date">{dueDate}</span>
-              </div>
-            )}
+      <div className="card-footer">
+        {renderAvatar
+          ? renderAvatar(avatarPath)
+          : avatarPath && <DefaultAvatar avatarPath={avatarPath} />}
 
-            {description && (
-              <div className="card-description">
-                <span className="detail-label">Description:</span>
-                <p>{description}</p>
-              </div>
-            )}
-          </div>
+        {hasDetails && toggleExpand && (
+          <button
+            onClick={() => toggleExpand(id)}
+            className="expand-toggle"
+            aria-label={isExpanded ? "Collapse card" : "Expand card"}
+            type="button"
+          >
+            <CollapseExpandIcon isExpanded={isExpanded} />
+          </button>
         )}
       </div>
-      {children}
     </motion.div>
   );
 };
