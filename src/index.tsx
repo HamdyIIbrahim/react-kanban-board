@@ -28,6 +28,18 @@ export interface Column {
   limit?: number; // Optional WIP limit
 }
 
+// New filter interfaces for dynamic filtering
+export interface FilterOption {
+  value: string;
+  label: string;
+}
+
+export interface FilterConfig {
+  field: string;
+  label: string;
+  options: FilterOption[];
+}
+
 interface DefaultCardProps {
   title: string;
   avatarPath?: string;
@@ -82,6 +94,8 @@ interface KanbanBoardProps {
   emptyColumnMessage?: string;
   enableSearch?: boolean;
   enableFiltering?: boolean;
+  filterConfigs?: FilterConfig[]; // New prop for custom filters
+  onFilterChange?: (filters: Record<string, string | null>) => void; // Optional callback
 }
 
 interface ColumnProps {
@@ -255,13 +269,12 @@ const KanbanBoard = ({
   emptyColumnMessage = "No cards yet",
   enableSearch = false,
   enableFiltering = false,
+  filterConfigs = [], // Default to empty array
+  onFilterChange,
 }: KanbanBoardProps) => {
   const [cards, setCards] = useState<Card[]>(initialCards);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filters, setFilters] = useState<{
-    priority?: string | null;
-    tags?: string[] | null;
-  }>({});
+  const [filters, setFilters] = useState<Record<string, string | null>>({});
   const [filteredCards, setFilteredCards] = useState<Card[]>(initialCards);
 
   const boardRef = useRef<HTMLDivElement>(null);
@@ -298,6 +311,29 @@ const KanbanBoard = ({
     setCards(initialCards);
   }, [initialCards]);
 
+  // Handle filter change
+  const handleFilterChange = (field: string, value: string | null) => {
+    const newFilters = {
+      ...filters,
+      [field]: value || null,
+    };
+    
+    // If value is empty, remove the filter
+    if (!value) {
+      delete newFilters[field];
+    }
+    
+    setFilters(newFilters);
+    onFilterChange?.(newFilters); // Notify parent component if callback exists
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setFilters({});
+    onFilterChange?.({});
+  };
+
+  // Updated useEffect for dynamic filtering
   useEffect(() => {
     let result = [...cards];
 
@@ -307,15 +343,19 @@ const KanbanBoard = ({
       );
     }
 
-    if (filters.priority) {
-      result = result.filter((card) => card.priority === filters.priority);
-    }
-
-    if (filters.tags && filters.tags.length > 0) {
-      result = result.filter((card) =>
-        card.tags?.some((tag) => filters.tags?.includes(tag))
-      );
-    }
+    // Apply all active filters dynamically
+    Object.entries(filters).forEach(([field, value]) => {
+      if (value) {
+        result = result.filter((card) => {
+          // Handle special case for tags which is an array
+          if (field === 'tags' && Array.isArray(card.tags)) {
+            return card.tags.includes(value);
+          }
+          // Standard field comparison
+          return card[field] === value;
+        });
+      }
+    });
 
     setFilteredCards(result);
   }, [searchTerm, filters, cards]);
@@ -330,49 +370,58 @@ const KanbanBoard = ({
 
   return (
     <div className="kanban-board-container" ref={boardRef}>
-      {enableSearch && (
+      {(enableSearch || (enableFiltering && filterConfigs.length > 0)) && (
         <div className="kanban-search">
-          <div className="search-input-wrapper">
-            <SearchIcon />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search cards..."
-              aria-label="Search cards"
-            />
-            {searchTerm && (
-              <button
-                className="clear-search"
-                onClick={() => setSearchTerm("")}
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            )}
-          </div>
+          {enableSearch && (
+            <div className="search-input-wrapper">
+              <SearchIcon />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search cards..."
+                aria-label="Search cards"
+              />
+              {searchTerm && (
+                <button
+                  className="clear-search"
+                  onClick={() => setSearchTerm("")}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
 
-          {enableFiltering && (
+          {enableFiltering && filterConfigs.length > 0 && (
             <div className="filter-controls">
-              <select
-                value={filters.priority || ""}
-                onChange={(e) =>
-                  setFilters({
-                    ...filters,
-                    priority: e.target.value || null,
-                  })
-                }
-                aria-label="Filter by priority"
-              >
-                <option value="">All Priorities</option>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
+              {filterConfigs.map((config) => (
+                <div key={config.field} className="filter-select-container">
+                  <label htmlFor={`filter-${config.field}`} className="filter-label">
+                    {config.label}:
+                  </label>
+                  <select
+                    id={`filter-${config.field}`}
+                    value={filters[config.field] || ""}
+                    onChange={(e) => 
+                      handleFilterChange(config.field, e.target.value || null)
+                    }
+                    aria-label={`Filter by ${config.label}`}
+                  >
+                    <option value="">All {config.label}s</option>
+                    {config.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
               <button
                 className="clear-filters"
-                onClick={() => setFilters({})}
-                disabled={!filters.priority && !filters.tags?.length}
+                onClick={clearAllFilters}
+                disabled={Object.keys(filters).length === 0}
                 aria-label="Clear filters"
               >
                 Clear Filters

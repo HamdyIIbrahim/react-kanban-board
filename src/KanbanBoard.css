@@ -77,9 +77,25 @@
   padding: 0 0.3rem;
 }
 
+/* Updated filter controls styling */
 .filter-controls {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.filter-select-container {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
+}
+
+.filter-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: #555;
 }
 
 .filter-controls select {
@@ -87,6 +103,8 @@
   border-radius: 4px;
   border: 1px solid #ddd;
   font-size: 0.9rem;
+  min-width: 120px;
+  background-color: white;
 }
 
 .clear-filters {
@@ -95,9 +113,12 @@
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
   opacity: 0.8;
   transition: opacity 0.2s;
+  white-space: nowrap;
+  margin-left: auto;
 }
 
 .clear-filters:not(:disabled):hover {
@@ -138,7 +159,6 @@
 .kanban-column {
   background-color: var(--column-bg);
   border-radius: var(--border-radius);
-  width: 320px; /* Fixed width */
   min-width: 320px;
   display: flex;
   flex-direction: column;
@@ -644,7 +664,7 @@
   background: #a8a8a8;
 }
 
-/* Responsive design */
+/* Responsive design for filters */
 @media (max-width: 768px) {
   .kanban-board {
     padding: 0.5rem;
@@ -663,6 +683,28 @@
   
   .search-input-wrapper {
     max-width: 100%;
+  }
+  
+  .filter-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+  
+  .filter-select-container {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .filter-controls select {
+    flex: 1;
+    width: 100%;
+  }
+  
+  .clear-filters {
+    margin-left: 0;
+    align-self: flex-end;
   }
 }
 
