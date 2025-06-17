@@ -22,13 +22,13 @@
 
 .kanban-board {
   display: flex;
-  gap: 1.25rem;
-  padding: 1.25rem;
+  gap: 1rem; /* Slightly reduced gap */
+  padding: 1rem;
   overflow-x: auto;
   min-height: 60vh;
-  align-items: flex-start; /* Keep columns aligned at the top */
+  align-items: flex-start;
   scroll-behavior: smooth;
-  padding-bottom: 2rem; /* Add space for scrollbar */
+  padding-bottom: 2rem;
   flex-wrap: nowrap; /* Prevent columns from wrapping */
 }
 
@@ -157,17 +157,16 @@
 .kanban-column {
   background-color: var(--column-bg);
   border-radius: var(--border-radius);
-  width: 320px; /* Fixed width */
-  min-width: 320px; /* Ensure consistent width */
-  max-width: 320px; /* Prevent expansion */
+  width: 350px; /* Slightly reduced width to prevent overflow */
+  min-width: 350px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.08));
   transition: all 0.3s ease;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.05));
   overflow: hidden;
   height: fit-content;
-  max-height: calc(100vh - 120px); /* Limit maximum height */
+  max-height: calc(100vh - 120px);
 }
 
 .kanban-column.active {
@@ -220,18 +219,17 @@
 }
 
 .column-content {
-  padding: 1rem;
+  padding: 0.75rem; /* Slightly reduced padding */
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem; /* Reduced gap */
   min-height: 100px;
   overflow-y: auto;
   overflow-x: hidden; /* Prevent horizontal scrolling */
-  transition: background-color 0.3s ease;
   scrollbar-width: thin;
-  height: 100%; /* Fill the available height */
-  max-height: calc(100vh - 200px); /* Ensure there's a maximum height */
+  height: 100%;
+  max-height: calc(100vh - 200px);
 }
 
 .column-content.active {
@@ -290,13 +288,10 @@
   color: var(--text-color);
   transition: all 0.2s ease;
   cursor: grab;
-  width: 100%; /* Ensure cards take full width of column */
-  overflow: hidden; /* Prevent content from spilling out */
-  word-break: break-word; /* Break long words */
-}
-
-.card:active {
-  cursor: grabbing;
+  max-width: 100%;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* Card Header */
@@ -854,7 +849,156 @@
 
 /* Fix empty state styling in dark mode */
 [data-theme="dark"] .column-empty-state {
-  color: #94a3b8;
-  border-color: #475569;
+  color: var(--muted-text);
+  border-color: var(--border-color);
   background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Add container classes to handle motion overflow */
+.motion-container {
+  width: 100%;
+  overflow: hidden; /* Contain motion overflow */
+  position: relative;
+}
+
+.motion-card-wrapper {
+  width: 100%;
+  margin: 0.25rem 0;
+}
+
+.add-card-container {
+  width: 100%;
+  overflow: hidden; /* Prevent overflow */
+}
+
+.add-card-motion-container {
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Fix column overflow issues */
+.kanban-column {
+  background-color: var(--column-bg);
+  border-radius: var(--border-radius);
+  width: 300px; /* Slightly reduced width to prevent overflow */
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.08));
+  transition: all 0.3s ease;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.05));
+  overflow: hidden;
+  height: fit-content;
+  max-height: calc(100vh - 120px);
+}
+
+/* Improve column content scrolling with hidden overflow-x */
+.column-content {
+  padding: 0.75rem; /* Slightly reduced padding */
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem; /* Reduced gap */
+  min-height: 100px;
+  overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  scrollbar-width: thin;
+  height: 100%;
+  max-height: calc(100vh - 200px);
+}
+
+/* Fix kanban board container to ensure proper layout */
+.kanban-board {
+  display: flex;
+  gap: 1rem; /* Slightly reduced gap */
+  padding: 1rem;
+  overflow-x: auto;
+  min-height: 60vh;
+  align-items: flex-start;
+  scroll-behavior: smooth;
+  padding-bottom: 2rem;
+  flex-wrap: nowrap; /* Prevent columns from wrapping */
+}
+
+/* Fix cards to prevent overflow */
+.card {
+  max-width: 100%;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Fix card title overflow */
+.card-title {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+/* Better dark mode theme support */
+[data-theme="dark"] {
+  --border-color: rgba(255, 255, 255, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.4);
+  --muted-text: #94a3b8;
+}
+
+[data-theme="dark"] .kanban-search {
+  background-color: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(5px);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .add-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .add-card:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .add-card-form {
+  background-color: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .add-card-input {
+  background-color: rgba(0, 0, 0, 0.2);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .add-card-buttons button:first-child {
+  background-color: var(--accent-color);
+}
+
+[data-theme="dark"] .add-card-buttons button:last-child {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+}
+
+/* Fix empty state styling in dark mode */
+[data-theme="dark"] .column-empty-state {
+  color: var(--muted-text);
+  border-color: var(--border-color);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Fix card-edit for dark themes */
+[data-theme="dark"] .card-edit {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .card-edit input {
+  background-color: rgba(0, 0, 0, 0.2);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+/* Fix drag preview for dark mode */
+[data-theme="dark"] .card-drag-preview {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  border-color: var(--accent-color);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
 }

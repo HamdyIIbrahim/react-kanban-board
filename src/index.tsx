@@ -80,15 +80,6 @@ interface KanbanBoardProps {
     column: string,
     setCards: React.Dispatch<React.SetStateAction<Card[]>>
   ) => ReactNode;
-  theme?: {
-    backgroundColor?: string;
-    columnBackgroundColor?: string;
-    columnHeaderColor?: { [key: string]: string } | string;
-    cardBackgroundColor?: string;
-    textColor?: string;
-    accentColor?: string;
-    borderRadius?: string;
-  };
   isLoading?: boolean;
   loadingComponent?: ReactNode;
   emptyColumnMessage?: string;
@@ -123,7 +114,6 @@ interface ColumnProps {
   ) => ReactNode;
   emptyColumnMessage?: string;
   filteredCards: Card[];
-  theme?: KanbanBoardProps["theme"];
 }
 
 interface AddCardProps {
@@ -263,7 +253,6 @@ const KanbanBoard = ({
   renderCard,
   renderAvatar,
   renderAddCard,
-  theme = {},
   isLoading = false,
   loadingComponent,
   emptyColumnMessage = "No cards yet",
@@ -278,61 +267,6 @@ const KanbanBoard = ({
   const [filteredCards, setFilteredCards] = useState<Card[]>(initialCards);
 
   const boardRef = useRef<HTMLDivElement>(null);
-
-  // Enhanced theme application
-  useEffect(() => {
-    const root = document.documentElement;
-    const applyThemeVar = (
-      cssVar: string,
-      value: string | undefined,
-      fallback: string
-    ) => {
-      if (value) {
-        root.style.setProperty(cssVar, value);
-      } else {
-        root.style.setProperty(cssVar, fallback);
-      }
-    };
-
-    // Apply all theme variables with fallbacks
-    applyThemeVar("--board-bg", theme.backgroundColor, "#f5f6f8");
-    applyThemeVar("--column-bg", theme.columnBackgroundColor, "#f8f9fa");
-    applyThemeVar("--card-bg", theme.cardBackgroundColor, "#ffffff");
-    applyThemeVar("--text-color", theme.textColor, "#1a1a1a");
-    applyThemeVar("--accent-color", theme.accentColor, "#228be6");
-    applyThemeVar("--border-radius", theme.borderRadius, "12px");
-
-    // Add additional theme variables for better dark mode support
-    if (theme.textColor && theme.textColor.startsWith("#f")) {
-      // Dark mode detection (if text is light colored)
-      root.setAttribute("data-theme", "dark");
-      root.style.setProperty("--border-color", "rgba(255, 255, 255, 0.1)");
-      root.style.setProperty("--shadow-color", "rgba(0, 0, 0, 0.4)");
-      root.style.setProperty("--hover-bg", "rgba(255, 255, 255, 0.05)");
-      root.style.setProperty("--muted-text", "#94a3b8");
-    } else {
-      root.setAttribute("data-theme", "light");
-      root.style.setProperty("--border-color", "rgba(0, 0, 0, 0.1)");
-      root.style.setProperty("--shadow-color", "rgba(0, 0, 0, 0.1)");
-      root.style.setProperty("--hover-bg", "rgba(0, 0, 0, 0.05)");
-      root.style.setProperty("--muted-text", "#64748b");
-    }
-
-    // Clean up when component unmounts
-    return () => {
-      root.style.removeProperty("--board-bg");
-      root.style.removeProperty("--column-bg");
-      root.style.removeProperty("--card-bg");
-      root.style.removeProperty("--text-color");
-      root.style.removeProperty("--accent-color");
-      root.style.removeProperty("--border-radius");
-      root.style.removeProperty("--border-color");
-      root.style.removeProperty("--shadow-color");
-      root.style.removeProperty("--hover-bg");
-      root.style.removeProperty("--muted-text");
-      root.removeAttribute("data-theme");
-    };
-  }, [theme]);
 
   useEffect(() => {
     setCards(initialCards);
@@ -483,7 +417,6 @@ const KanbanBoard = ({
             onTaskAddedCallback={onTaskAddedCallback}
             columnForAddCard={columnForAddCard}
             emptyColumnMessage={emptyColumnMessage}
-            theme={theme}
           />
         ))}
       </div>
@@ -508,7 +441,6 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   renderAddCard,
   onTaskAddedCallback,
   emptyColumnMessage,
-  theme,
 }) => {
   const [active, setActive] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -520,13 +452,8 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   const columnRef = useRef<HTMLDivElement>(null);
   const isLimitExceeded = limit !== undefined && filteredCards.length > limit;
 
-  // Get column header style based on theme - for dynamic column header colors
   const columnStyle = {
-    backgroundColor:
-      typeof theme?.columnHeaderColor === "object" &&
-      theme.columnHeaderColor[column]
-        ? theme.columnHeaderColor[column]
-        : color,
+    backgroundColor: color,
   };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>, card: Card) => {
@@ -764,62 +691,66 @@ const ColumnComponent: React.FC<ColumnProps> = ({
         ) : (
           <AnimatePresence>
             {filteredCards.map((card) => (
-              <motion.div
-                key={card.id}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
-                data-card-id={card.id}
-              >
+              <div className="motion-container" key={card.id}>
                 <DropIndicator beforeId={card.id} column={column} />
-                {editingCardId === card.id ? (
-                  <div className="card-edit">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={newTitle}
-                      onChange={handleEditChange}
-                      onBlur={() => handleSaveEdit(card.id)}
-                      onKeyDown={(e) => handleKeyDown(e, card.id)}
-                      aria-label="Edit card title"
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  data-card-id={card.id}
+                  className="motion-card-wrapper"
+                >
+                  {editingCardId === card.id ? (
+                    <div className="card-edit">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={newTitle}
+                        onChange={handleEditChange}
+                        onBlur={() => handleSaveEdit(card.id)}
+                        onKeyDown={(e) => handleKeyDown(e, card.id)}
+                        aria-label="Edit card title"
+                      />
+                    </div>
+                  ) : renderCard ? (
+                    renderCard(
+                      card,
+                      handleDragStart,
+                      expandedCards[card.id],
+                      toggleExpand
+                    )
+                  ) : (
+                    <DefaultCard
+                      {...card}
+                      handleDragStart={handleDragStart}
+                      renderAvatar={renderAvatar}
+                      isExpanded={expandedCards[card.id]}
+                      toggleExpand={() => toggleExpand(card.id)}
+                      onDelete={() => handleDeleteCard(card.id)}
+                      onEdit={() => handleEditClick(card.id, card.title)}
                     />
-                  </div>
-                ) : renderCard ? (
-                  renderCard(
-                    card,
-                    handleDragStart,
-                    expandedCards[card.id],
-                    toggleExpand
-                  )
-                ) : (
-                  <DefaultCard
-                    {...card}
-                    handleDragStart={handleDragStart}
-                    renderAvatar={renderAvatar}
-                    isExpanded={expandedCards[card.id]}
-                    toggleExpand={() => toggleExpand(card.id)}
-                    onDelete={() => handleDeleteCard(card.id)}
-                    onEdit={() => handleEditClick(card.id, card.title)}
-                  />
-                )}
-              </motion.div>
+                  )}
+                </motion.div>
+              </div>
             ))}
           </AnimatePresence>
         )}
         <DropIndicator beforeId={-1} column={column} />
-        {columnForAddCard === column ? (
-          renderAddCard ? (
-            renderAddCard(column, setCards)
-          ) : (
-            <DefaultAddCard
-              column={column}
-              setCards={setCards}
-              onTaskAddedCallback={onTaskAddedCallback}
-            />
-          )
-        ) : null}
+        <div className="add-card-container">
+          {columnForAddCard === column ? (
+            renderAddCard ? (
+              renderAddCard(column, setCards)
+            ) : (
+              <DefaultAddCard
+                column={column}
+                setCards={setCards}
+                onTaskAddedCallback={onTaskAddedCallback}
+              />
+            )
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -1010,39 +941,41 @@ const DefaultAddCard = ({
 
   // Improved rendering to ensure proper overflow handling
   return isAdding ? (
-    <motion.form
-      onSubmit={handleSubmit}
-      className="add-card-form"
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-    >
-      <div className="add-card-input-container">
-        <input
-          type="text"
-          className="add-card-input"
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          placeholder="Enter card title..."
-          autoFocus
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setIsAdding(false);
-            }
-          }}
-          aria-label="New card title"
-          maxLength={200} // Prevent extremely long titles
-        />
-      </div>
-      <div className="add-card-buttons">
-        <button type="submit" disabled={!newTitle.trim()}>
-          Add Card
-        </button>
-        <button type="button" onClick={() => setIsAdding(false)}>
-          Cancel
-        </button>
-      </div>
-    </motion.form>
+    <div className="add-card-motion-container">
+      <motion.form
+        onSubmit={handleSubmit}
+        className="add-card-form"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+      >
+        <div className="add-card-input-container">
+          <input
+            type="text"
+            className="add-card-input"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Enter card title..."
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setIsAdding(false);
+              }
+            }}
+            aria-label="New card title"
+            maxLength={200} // Prevent extremely long titles
+          />
+        </div>
+        <div className="add-card-buttons">
+          <button type="submit" disabled={!newTitle.trim()}>
+            Add Card
+          </button>
+          <button type="button" onClick={() => setIsAdding(false)}>
+            Cancel
+          </button>
+        </div>
+      </motion.form>
+    </div>
   ) : (
     <motion.div
       className="add-card"
