@@ -5,6 +5,10 @@
   --text-color: #1a1a1a;
   --accent-color: #228be6;
   --border-radius: 12px;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --border-color: rgba(0, 0, 0, 0.05);
+  --muted-text: #666;
+  --hover-bg: rgba(34, 139, 230, 0.1);
 }
 
 .kanban-board-container {
@@ -22,9 +26,10 @@
   padding: 1.25rem;
   overflow-x: auto;
   min-height: 60vh;
-  align-items: flex-start;
+  align-items: flex-start; /* Keep columns aligned at the top */
   scroll-behavior: smooth;
   padding-bottom: 2rem; /* Add space for scrollbar */
+  flex-wrap: nowrap; /* Prevent columns from wrapping */
 }
 
 /* Search and filtering */
@@ -47,8 +52,8 @@
 .search-input-wrapper {
   display: flex;
   align-items: center;
-  background-color: white;
-  border: 1px solid #ddd;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 24px;
   padding: 0.5rem 1rem;
   flex: 1;
@@ -57,7 +62,7 @@
 
 .search-input-wrapper svg {
   margin-right: 0.5rem;
-  color: #666;
+  color: var(--muted-text);
 }
 
 .search-input-wrapper input {
@@ -66,15 +71,7 @@
   flex: 1;
   font-size: 0.9rem;
   background: transparent;
-}
-
-.clear-search {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  color: #666;
-  cursor: pointer;
-  padding: 0 0.3rem;
+  color: var(--text-color);
 }
 
 /* Updated filter controls styling */
@@ -95,16 +92,17 @@
   font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
-  color: #555;
+  color: var(--muted-text);
 }
 
 .filter-controls select {
   padding: 0.5rem;
   border-radius: 4px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   font-size: 0.9rem;
   min-width: 120px;
-  background-color: white;
+  background-color: var(--card-bg);
+  color: var(--text-color);
 }
 
 .clear-filters {
@@ -159,7 +157,9 @@
 .kanban-column {
   background-color: var(--column-bg);
   border-radius: var(--border-radius);
-  min-width: 320px;
+  width: 320px; /* Fixed width */
+  min-width: 320px; /* Ensure consistent width */
+  max-width: 320px; /* Prevent expansion */
   display: flex;
   flex-direction: column;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -167,7 +167,7 @@
   border: 1px solid rgba(0, 0, 0, 0.05);
   overflow: hidden;
   height: fit-content;
-  max-height: calc(100vh - 50px);
+  max-height: calc(100vh - 120px); /* Limit maximum height */
 }
 
 .kanban-column.active {
@@ -226,10 +226,12 @@
   flex-direction: column;
   gap: 0.75rem;
   min-height: 100px;
-  max-height: calc(100vh - 140px);
   overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
   transition: background-color 0.3s ease;
   scrollbar-width: thin;
+  height: 100%; /* Fill the available height */
+  max-height: calc(100vh - 200px); /* Ensure there's a maximum height */
 }
 
 .column-content.active {
@@ -283,12 +285,14 @@
   background: var(--card-bg);
   border-radius: 10px;
   padding: 1.25rem;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 5px var(--shadow-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
   transition: all 0.2s ease;
   cursor: grab;
-  border: 1px solid #e0e0e0;
-  font-size: 1rem;
-  position: relative;
+  width: 100%; /* Ensure cards take full width of column */
+  overflow: hidden; /* Prevent content from spilling out */
+  word-break: break-word; /* Break long words */
 }
 
 .card:active {
@@ -308,9 +312,15 @@
   margin: 0;
   padding-right: 4rem; /* Space for action buttons */
   font-weight: 500;
-  word-break: break-word;
+  word-break: break-word; /* Break long words */
+  overflow-wrap: break-word; /* Handle overflow */
   color: var(--text-color);
   line-height: 1.4;
+  max-height: 4.2em; /* Limit height to ~3 lines */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3; /* Show max 3 lines before truncating */
 }
 
 /* Card Actions */
@@ -335,7 +345,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--muted-text);
   padding: 0.25rem;
   border-radius: 4px;
   display: flex;
@@ -345,7 +355,7 @@
 }
 
 .card-action-button:hover {
-  background-color: #f9fafb;
+  background-color: var(--hover-bg);
 }
 
 .card-action-button.edit:hover {
@@ -388,14 +398,14 @@
 .card-details {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--border-color);
   overflow: hidden;
 }
 
 .card-description p {
   margin: 0 0 0.75rem;
   font-size: 0.85rem;
-  color: #4b5563;
+  color: var(--muted-text);
   line-height: 1.4;
 }
 
@@ -408,12 +418,12 @@
 
 .detail-label {
   font-weight: 600;
-  color: #6b7280;
+  color: var(--muted-text);
   margin-right: 0.5rem;
 }
 
 .detail-value {
-  color: #374151;
+  color: var(--text-color);
 }
 
 /* Tag styling */
@@ -745,4 +755,106 @@
 
 .card-moving {
   animation: cardMove 0.2s ease;
+}
+
+/* Improved theming for card components */
+.card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 2px 5px var(--shadow-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+}
+
+.card:hover .card-actions {
+  opacity: 1;
+}
+
+/* Better card action button theming */
+.card-action-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted-text);
+}
+
+.card-action-button:hover {
+  background-color: var(--hover-bg);
+}
+
+/* Theme-aware card details */
+.card-details {
+  border-top: 1px solid var(--border-color);
+}
+
+.card-description p {
+  color: var(--muted-text);
+}
+
+.detail-label {
+  color: var(--muted-text);
+}
+
+.detail-value {
+  color: var(--text-color);
+}
+
+/* Theme-aware filter controls */
+.filter-controls select {
+  border: 1px solid var(--border-color);
+  background-color: var(--card-bg);
+  color: var(--text-color);
+}
+
+.filter-label {
+  color: var(--muted-text);
+}
+
+/* Improved search input theming */
+.search-input-wrapper {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+
+.search-input-wrapper input {
+  color: var(--text-color);
+}
+
+.search-input-wrapper svg {
+  color: var(--muted-text);
+}
+
+/* Fix WIP limit notification visibility in dark mode */
+[data-theme="dark"] .wip-limit-notification {
+  background-color: #ef5350;
+}
+
+/* Ensure priority badges have good contrast in all themes */
+[data-theme="dark"] .priority-badge.high {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+[data-theme="dark"] .priority-badge.medium {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .priority-badge.low {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+/* Fix counter styling in dark mode */
+[data-theme="dark"] .counter {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+/* Fix empty state styling in dark mode */
+[data-theme="dark"] .column-empty-state {
+  color: #94a3b8;
+  border-color: #475569;
+  background-color: rgba(255, 255, 255, 0.03);
 }

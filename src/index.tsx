@@ -279,22 +279,44 @@ const KanbanBoard = ({
 
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // Apply theme variables for dynamic theming
+  // Enhanced theme application
   useEffect(() => {
     const root = document.documentElement;
+    const applyThemeVar = (
+      cssVar: string,
+      value: string | undefined,
+      fallback: string
+    ) => {
+      if (value) {
+        root.style.setProperty(cssVar, value);
+      } else {
+        root.style.setProperty(cssVar, fallback);
+      }
+    };
 
-    if (theme.backgroundColor)
-      root.style.setProperty("--board-bg", theme.backgroundColor);
-    if (theme.columnBackgroundColor)
-      root.style.setProperty("--column-bg", theme.columnBackgroundColor);
-    if (theme.cardBackgroundColor)
-      root.style.setProperty("--card-bg", theme.cardBackgroundColor);
-    if (theme.textColor)
-      root.style.setProperty("--text-color", theme.textColor);
-    if (theme.accentColor)
-      root.style.setProperty("--accent-color", theme.accentColor);
-    if (theme.borderRadius)
-      root.style.setProperty("--border-radius", theme.borderRadius);
+    // Apply all theme variables with fallbacks
+    applyThemeVar("--board-bg", theme.backgroundColor, "#f5f6f8");
+    applyThemeVar("--column-bg", theme.columnBackgroundColor, "#f8f9fa");
+    applyThemeVar("--card-bg", theme.cardBackgroundColor, "#ffffff");
+    applyThemeVar("--text-color", theme.textColor, "#1a1a1a");
+    applyThemeVar("--accent-color", theme.accentColor, "#228be6");
+    applyThemeVar("--border-radius", theme.borderRadius, "12px");
+
+    // Add additional theme variables for better dark mode support
+    if (theme.textColor && theme.textColor.startsWith("#f")) {
+      // Dark mode detection (if text is light colored)
+      root.setAttribute("data-theme", "dark");
+      root.style.setProperty("--border-color", "rgba(255, 255, 255, 0.1)");
+      root.style.setProperty("--shadow-color", "rgba(0, 0, 0, 0.4)");
+      root.style.setProperty("--hover-bg", "rgba(255, 255, 255, 0.05)");
+      root.style.setProperty("--muted-text", "#94a3b8");
+    } else {
+      root.setAttribute("data-theme", "light");
+      root.style.setProperty("--border-color", "rgba(0, 0, 0, 0.1)");
+      root.style.setProperty("--shadow-color", "rgba(0, 0, 0, 0.1)");
+      root.style.setProperty("--hover-bg", "rgba(0, 0, 0, 0.05)");
+      root.style.setProperty("--muted-text", "#64748b");
+    }
 
     // Clean up when component unmounts
     return () => {
@@ -304,6 +326,11 @@ const KanbanBoard = ({
       root.style.removeProperty("--text-color");
       root.style.removeProperty("--accent-color");
       root.style.removeProperty("--border-radius");
+      root.style.removeProperty("--border-color");
+      root.style.removeProperty("--shadow-color");
+      root.style.removeProperty("--hover-bg");
+      root.style.removeProperty("--muted-text");
+      root.removeAttribute("data-theme");
     };
   }, [theme]);
 
@@ -317,12 +344,12 @@ const KanbanBoard = ({
       ...filters,
       [field]: value || null,
     };
-    
+
     // If value is empty, remove the filter
     if (!value) {
       delete newFilters[field];
     }
-    
+
     setFilters(newFilters);
     onFilterChange?.(newFilters); // Notify parent component if callback exists
   };
@@ -348,7 +375,7 @@ const KanbanBoard = ({
       if (value) {
         result = result.filter((card) => {
           // Handle special case for tags which is an array
-          if (field === 'tags' && Array.isArray(card.tags)) {
+          if (field === "tags" && Array.isArray(card.tags)) {
             return card.tags.includes(value);
           }
           // Standard field comparison
@@ -398,13 +425,16 @@ const KanbanBoard = ({
             <div className="filter-controls">
               {filterConfigs.map((config) => (
                 <div key={config.field} className="filter-select-container">
-                  <label htmlFor={`filter-${config.field}`} className="filter-label">
+                  <label
+                    htmlFor={`filter-${config.field}`}
+                    className="filter-label"
+                  >
                     {config.label}:
                   </label>
                   <select
                     id={`filter-${config.field}`}
                     value={filters[config.field] || ""}
-                    onChange={(e) => 
+                    onChange={(e) =>
                       handleFilterChange(config.field, e.target.value || null)
                     }
                     aria-label={`Filter by ${config.label}`}
@@ -522,7 +552,6 @@ const ColumnComponent: React.FC<ColumnProps> = ({
     setExpandedCards((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Fixed handleDragEnd function for proper card reordering
   const handleDragEnd = (e: DragEvent<HTMLDivElement>) => {
     const cardId = e.dataTransfer.getData("cardId");
 
@@ -543,47 +572,54 @@ const ColumnComponent: React.FC<ColumnProps> = ({
       let copy = [...cards];
 
       // Find the card being dragged
-      let cardToTransfer = copy.find((c) => c.id === cardId);
-      if (!cardToTransfer) return;
+      const cardToMove = copy.find((c) => c.id === cardId);
+      if (!cardToMove) return;
 
-      // Check if the column has a limit
-      if (limit !== undefined) {
+      // Get the current status of the card
+      const currentStatus = cardToMove.status;
+      const isSameColumn = currentStatus === column;
+
+      // If moving to a different column, check column limits
+      if (!isSameColumn && limit !== undefined) {
         const columnCardCount = copy.filter(
           (c) => c.status === column && c.id !== cardId
         ).length;
 
         // If moving to this column would exceed the limit
-        if (cardToTransfer.status !== column && columnCardCount >= limit) {
-          // Show WIP limit exceeded notification
+        if (columnCardCount >= limit) {
           showWipLimitNotification(columnRef.current);
           return;
         }
       }
 
-      // Update the card's status to the new column
-      cardToTransfer = { ...cardToTransfer, status: column };
-
       // Remove the card from its original position
       copy = copy.filter((c) => c.id !== cardId);
+
+      // Create updated card with new status if column changed
+      const updatedCard = isSameColumn
+        ? cardToMove
+        : { ...cardToMove, status: column };
 
       // Determine if we're adding the card to the end of the column
       const moveToBack = before === "-1";
 
       if (moveToBack) {
         // Add the card to the end of the array
-        copy.push(cardToTransfer);
+        copy.push(updatedCard);
       } else {
         // Find the index where to insert the card
         const insertAtIndex = copy.findIndex((el) => el.id === before);
         if (insertAtIndex === -1) return; // Invalid index
 
         // Insert the card at the proper position
-        copy.splice(insertAtIndex, 0, cardToTransfer);
+        copy.splice(insertAtIndex, 0, updatedCard);
       }
 
-      // Update state and trigger callback
+      // Update state and trigger callback if the column changed
       setCards(copy);
-      onCardMove?.(cardId, column);
+      if (!isSameColumn) {
+        onCardMove?.(cardId, column);
+      }
     }
   };
 
@@ -956,6 +992,7 @@ const DefaultAddCard = ({
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
 
+  // Handle form submission for new card
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newTitle.trim()) {
@@ -971,12 +1008,7 @@ const DefaultAddCard = ({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      setIsAdding(false);
-    }
-  };
-
+  // Improved rendering to ensure proper overflow handling
   return isAdding ? (
     <motion.form
       onSubmit={handleSubmit}
@@ -993,8 +1025,13 @@ const DefaultAddCard = ({
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Enter card title..."
           autoFocus
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setIsAdding(false);
+            }
+          }}
           aria-label="New card title"
+          maxLength={200} // Prevent extremely long titles
         />
       </div>
       <div className="add-card-buttons">
