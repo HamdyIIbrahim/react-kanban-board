@@ -22,17 +22,16 @@
 
 .kanban-board {
   display: flex;
-  gap: 1rem; /* Slightly reduced gap */
+  gap: 1rem; 
   padding: 1rem;
   overflow-x: auto;
   min-height: 60vh;
   align-items: flex-start;
   scroll-behavior: smooth;
   padding-bottom: 2rem;
-  flex-wrap: nowrap; /* Prevent columns from wrapping */
+  flex-wrap: nowrap; 
 }
 
-/* Search and filtering */
 .kanban-search {
   padding: 1rem;
   background-color: rgba(255, 255, 255, 0.6);
@@ -74,7 +73,7 @@
   color: var(--text-color);
 }
 
-/* Updated filter controls styling */
+
 .filter-controls {
   display: flex;
   flex-wrap: wrap;

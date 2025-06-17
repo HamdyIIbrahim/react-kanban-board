@@ -87,6 +87,15 @@ interface KanbanBoardProps {
   enableFiltering?: boolean;
   filterConfigs?: FilterConfig[]; // New prop for custom filters
   onFilterChange?: (filters: Record<string, string | null>) => void; // Optional callback
+  renderSearchInput?: (
+    searchTerm: string,
+    setSearchTerm: React.Dispatch<React.SetStateAction<string>>
+  ) => ReactNode;
+  renderFilterMenu?: (
+    config: FilterConfig,
+    value: string | null,
+    handleFilterChange: (field: string, value: string | null) => void
+  ) => ReactNode;
 }
 
 interface ColumnProps {
@@ -258,8 +267,10 @@ const KanbanBoard = ({
   emptyColumnMessage = "No cards yet",
   enableSearch = false,
   enableFiltering = false,
-  filterConfigs = [], // Default to empty array
+  filterConfigs = [],
   onFilterChange,
+  renderSearchInput,
+  renderFilterMenu,
 }: KanbanBoardProps) => {
   const [cards, setCards] = useState<Card[]>(initialCards);
   const [searchTerm, setSearchTerm] = useState("");
@@ -294,7 +305,6 @@ const KanbanBoard = ({
     onFilterChange?.({});
   };
 
-  // Updated useEffect for dynamic filtering
   useEffect(() => {
     let result = [...cards];
 
@@ -334,52 +344,71 @@ const KanbanBoard = ({
       {(enableSearch || (enableFiltering && filterConfigs.length > 0)) && (
         <div className="kanban-search">
           {enableSearch && (
-            <div className="search-input-wrapper">
-              <SearchIcon />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search cards..."
-                aria-label="Search cards"
-              />
-              {searchTerm && (
-                <button
-                  className="clear-search"
-                  onClick={() => setSearchTerm("")}
-                  aria-label="Clear search"
-                >
-                  ×
-                </button>
+            <>
+              {renderSearchInput ? (
+                renderSearchInput(searchTerm, setSearchTerm)
+              ) : (
+                <div className="search-input-wrapper">
+                  <SearchIcon />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search cards..."
+                    aria-label="Search cards"
+                  />
+                  {searchTerm && (
+                    <button
+                      className="clear-search"
+                      onClick={() => setSearchTerm("")}
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
 
           {enableFiltering && filterConfigs.length > 0 && (
             <div className="filter-controls">
               {filterConfigs.map((config) => (
                 <div key={config.field} className="filter-select-container">
-                  <label
-                    htmlFor={`filter-${config.field}`}
-                    className="filter-label"
-                  >
-                    {config.label}:
-                  </label>
-                  <select
-                    id={`filter-${config.field}`}
-                    value={filters[config.field] || ""}
-                    onChange={(e) =>
-                      handleFilterChange(config.field, e.target.value || null)
-                    }
-                    aria-label={`Filter by ${config.label}`}
-                  >
-                    <option value="">All {config.label}s</option>
-                    {config.options.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  {renderFilterMenu ? (
+                    renderFilterMenu(
+                      config,
+                      filters[config.field] || null,
+                      handleFilterChange
+                    )
+                  ) : (
+                    <>
+                      <label
+                        htmlFor={`filter-${config.field}`}
+                        className="filter-label"
+                      >
+                        {config.label}:
+                      </label>
+                      <select
+                        id={`filter-${config.field}`}
+                        value={filters[config.field] || ""}
+                        onChange={(e) =>
+                          handleFilterChange(
+                            config.field,
+                            e.target.value || null
+                          )
+                        }
+                        aria-label={`Filter by ${config.label}`}
+                      >
+                        <option value="">All {config.label}s</option>
+                        {config.options.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                 </div>
               ))}
               <button
