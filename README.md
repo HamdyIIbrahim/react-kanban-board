@@ -6,12 +6,8 @@ A flexible and customizable Kanban board component for applications. The `Kanban
 
 Here are some visual examples of the Kanban board component:
 
-- ![Example 1](./public/assets/images/kanban1.png)
+- ![Example 1](./public/assets/images/Kanban_board.gif)
 - ![Example 2](./public/assets/images/kanban2.png)
-- ![Example 3](./public/assets/images/kanban4.png)
-- ![Example 4](./public/assets/images/kanban5.png)
-- ![Example 5](./public/assets/images/kanban6.png)
-- ![Example 6](./public/assets/images/kanban3.png)
 
 ## Features
 
