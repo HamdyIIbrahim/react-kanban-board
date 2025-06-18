@@ -1,6 +1,6 @@
-# KanbanBoard React Component
+# KanbanBoard Component
 
-A flexible and customizable Kanban board component for React applications. The `KanbanBoard` component allows you to create interactive and draggable task cards organized into columns, making it ideal for project management and task tracking.
+A flexible and customizable Kanban board component for applications. The `KanbanBoard` component allows you to create interactive and draggable task cards organized into columns, making it ideal for project management and task tracking.
 
 ### KanbanBoard Component
 
