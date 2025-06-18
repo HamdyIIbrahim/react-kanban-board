@@ -341,17 +341,18 @@ export default App;
 
 ### Card Interface
 
-| Property      | Type       | Description                                     |
-| ------------- | ---------- | ----------------------------------------------- |
-| `id`          | `string`   | Unique identifier for the card.                 |
-| `title`       | `string`   | Title of the card.                              |
-| `status`      | `string`   | Status of the card, corresponds to column key.  |
-| `avatarPath`  | `string`   | URL to the avatar image.                        |
-| `priority`    | `string`   | Priority level (e.g., "High", "Medium", "Low"). |
-| `dueDate`     | `string`   | Due date for the card.                          |
-| `tags`        | `string[]` | Array of tags for the card.                     |
-| `description` | `string`   | Detailed description of the card.               |
-| `assignee`    | `string`   | Person assigned to the card.                    |
+| Property        | Type       | Description                                     |
+| --------------- | ---------- | ----------------------------------------------- |
+| `id`            | `string`   | Unique identifier for the card.                 |
+| `title`         | `string`   | Title of the card.                              |
+| `status`        | `string`   | Status of the card, corresponds to column key.  |
+| `avatarPath`    | `string`   | URL to the avatar image.                        |
+| `priority`      | `string`   | Priority level (e.g., "High", "Medium", "Low"). |
+| `dueDate`       | `string`   | Due date for the card.                          |
+| `tags`          | `string[]` | Array of tags for the card.                     |
+| `description`   | `string`   | Detailed description of the card.               |
+| `assignee`      | `string`   | Person assigned to the card.                    |
+| `[key: string]` | `any`      | Any additional custom properties you need.      |
 
 ### FilterConfig Interface
 
