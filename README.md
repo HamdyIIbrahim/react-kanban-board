@@ -1,25 +1,29 @@
-# KanbanBoard React Component
+# KanbanBoard Component
 
-A flexible and customizable Kanban board component for React applications. The `KanbanBoard` component allows you to create interactive and draggable task cards organized into columns, making it ideal for project management and task tracking.
+A flexible and customizable Kanban board component for applications. The `KanbanBoard` component allows you to create interactive and draggable task cards organized into columns, making it ideal for project management and task tracking.
 
 ### KanbanBoard Component
 
 Here are some visual examples of the Kanban board component:
 
-- ![Example 1](./public/assets/images/kanban1.png)
+- ![Example 1](./public/assets/images/Kanban_board.gif)
 - ![Example 2](./public/assets/images/kanban2.png)
-- ![Example 3](./public/assets/images/kanban4.png)
-- ![Example 4](./public/assets/images/kanban5.png)
-- ![Example 5](./public/assets/images/kanban6.png)
-- ![Example 6](./public/assets/images/kanban3.png)
 
 ## Features
 
-- **Drag and Drop Functionality:** Move task cards between columns with ease.
-- **Customizable Card Rendering:** Tailor the appearance of task cards to fit your design.
-- **Add, Edit, and Delete Tasks:** Manage tasks directly from the Kanban board.
-- **Support for Avatars:** Display avatars on task cards for better team representation.
-- **Customizable Actions:** Define custom actions for task cards.
+- **Drag and Drop Functionality:** Move task cards between columns with ease
+- **Customizable Card Rendering:** Tailor the appearance of task cards to fit your design
+- **Add, Edit, and Delete Tasks:** Manage tasks directly from the Kanban board
+- **Support for Avatars:** Display avatars on task cards for better team representation
+- **Custom Search Interface:** Replace the default search with your own implementation
+- **Custom Filter Menus:** Create advanced filter controls using your preferred UI library
+- **WIP Limits:** Set limits on the number of cards allowed in each column
+- **Card Details with Expand/Collapse:** Show or hide detailed information for each card
+- **Dynamic Filtering:** Filter cards by various properties (priority, assignee, status)
+- **Search Functionality:** Search for cards by title
+- **UI Library Integration:** Seamlessly integrate with popular UI libraries like Chakra UI
+- **Responsive Design:** Works on desktop and mobile devices
+- **Accessibility Features:** Built with accessibility in mind
 
 ## Installation
 
@@ -34,34 +38,37 @@ or using yarn:
 ```bash
 yarn add react-custom-kanban-board
 ```
+
 ## Usage
-## Basic Example
-### Import and use the Kanban board in your React project:
 
-```bash
-import React from 'react';
-import KanbanBoard from 'react-custom-kanban-board';
+### Basic Example
 
-const columns: Column[] = [
-    { title: "To Do", key: "todo", color: "#BDBDCD" },
-    { title: "In Progress", key: "in-progress", color: "#FDDDE3" },
-    { title: "Done", key: "done", color: "#71C781" },
-  ];
+Import and use the Kanban board in your React project:
 
-const initialCards: Card[] = [
-    {
-      id: "1",
-      title: "Task 1",
-      status: "todo",
-      avatarPath: "https://i.pravatar.cc/40?img=1",
-    },
-    {
-      id: "2",
-      title: "Task 2",
-      status: "in-progress",
-      avatarPath: "https://i.pravatar.cc/40?img=2",
-    },
-  ];
+```jsx
+import React from "react";
+import KanbanBoard from "react-custom-kanban-board";
+
+const columns = [
+  { title: "To Do", key: "todo", color: "#BDBDCD" },
+  { title: "In Progress", key: "in-progress", color: "#FDDDE3" },
+  { title: "Done", key: "done", color: "#71C781" },
+];
+
+const initialCards = [
+  {
+    id: "1",
+    title: "Task 1",
+    status: "todo",
+    avatarPath: "https://i.pravatar.cc/40?img=1",
+  },
+  {
+    id: "2",
+    title: "Task 2",
+    status: "in-progress",
+    avatarPath: "https://i.pravatar.cc/40?img=2",
+  },
+];
 
 const App = () => {
   return (
@@ -79,113 +86,214 @@ const App = () => {
 export default App;
 ```
 
-## Custom Example
-### Customize the Kanban board's card rendering and actions:
+### Advanced Example with Chakra UI Integration
 
-```bash
-import React from 'react';
-import KanbanBoard, { Card, Column } from 'react-custom-kanban-board';
+Here's how to integrate the Kanban board with Chakra UI for enhanced UI components:
 
-const columns : Column[] = [
-  { title: "To Do", key: "todo", color: "#f0ad4e" },
-  { title: "In Progress", key: "in-progress", color: "#5bc0de" },
-  { title: "Done", key: "done", color: "#5cb85c" },
-];
+```jsx
+import React, { useState, useEffect, useRef } from "react";
+import KanbanBoard from "react-custom-kanban-board";
+import {
+  ChakraProvider,
+  InputGroup,
+  Input,
+  InputLeftElement,
+  InputRightElement,
+  IconButton,
+  Box,
+  Text,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Button,
+  Divider,
+  extendTheme,
+} from "@chakra-ui/react";
+import { SearchIcon, ChevronDownIcon, CloseIcon } from "@chakra-ui/icons";
+import "./App.css";
 
-const initialCards : Card[] = [
-  {
-    id: "1",
-    title: "Task 1",
-    status: "todo",
-    avatarPath: "https://i.pravatar.cc/40?img=1",
-  },
-  {
-    id: "2",
-    title: "Task 2",
-    status: "in-progress",
-    avatarPath: "https://i.pravatar.cc/40?img=2",
-  },
-];
-
-const renderCard = (card: Card, handleDragStart: (e: React.DragEvent<HTMLDivElement>, card: Card) => void) => (
-  <div
-    draggable
-    onDragStart={(e) => handleDragStart(e, card)}
-    style={{
-      backgroundColor: "#f9f9f9",
-      border: "1px solid #ddd",
-      borderRadius: "8px",
-      padding: "16px",
-      margin: "8px 0",
-      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-      transition: "transform 0.2s",
-    }}
-    onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-  >
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
-      <h3
-        style={{
-          fontSize: "1.2rem",
-          color: "#333",
-          margin: 0,
-        }}
-      >
-        {card.title}
-      </h3>
-      {card.avatarPath && <img src={card.avatarPath} alt={`image ${card.avatarPath}`} style={{ width: "32px", height: "32px", borderRadius: "50%", border: "2px solid #007bff" }} />}
-    </div>
-  </div>
-);
-
-const renderAddCard = (column: string, setCards: React.Dispatch<React.SetStateAction<Card[]>>) => (
-  <div style={{ margin: "16px 0" }}>
-    <button
-      onClick={() =>
-        setCards((prev) => [
-          ...prev,
-          {
-            id: Math.random().toString(),
-            title: "New Task",
-            status: column,
-          },
-        ])
-      }
-      style={{
-        backgroundColor: "#007bff",
-        color: "white",
-        border: "none",
-        borderRadius: "4px",
-        padding: "10px 16px",
-        cursor: "pointer",
-        transition: "background-color 0.2s",
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#0056b3")}
-      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#007bff")}
-    >
-      + Add a card
-    </button>
-  </div>
-);
+// Create a theme
+const theme = extendTheme({
+  // Your theme customizations here (optional)
+});
 
 const App = () => {
-  return (
-    <div>
-      <h1>My Custom Kanban Board</h1>
-      <KanbanBoard
-        columns={columns}
-        initialCards={initialCards}
-        columnForAddCard="todo"
-        renderCard={renderCard}
-        renderAddCard={renderAddCard}
+  // Sample columns with WIP limits
+  const columns = [
+    { title: "To Do", key: "todo", color: "#B8C2CC" },
+    { title: "In Progress", key: "in-progress", color: "#FFB1C1", limit: 3 }, // WIP limit
+    { title: "Review", key: "review", color: "#FFD580" },
+    { title: "Done", key: "done", color: "#91D18B" },
+  ];
+
+  // Sample cards data
+  const initialCards = [
+    {
+      id: "1",
+      title: "Create user authentication flow",
+      status: "todo",
+      avatarPath: "https://i.pravatar.cc/40?img=1",
+      priority: "High",
+      dueDate: "2023-06-30",
+      tags: ["frontend", "auth"],
+      description:
+        "Implement user registration, login, and password reset flows.",
+      assignee: "john",
+    },
+    // ... more cards
+  ];
+
+  // Filter configurations
+  const filterConfigs = [
+    {
+      field: "priority",
+      label: "Priority",
+      options: [
+        { value: "High", label: "High Priority" },
+        { value: "Medium", label: "Medium Priority" },
+        { value: "Low", label: "Low Priority" },
+      ],
+    },
+    // ... more filter configs
+  ];
+
+  const [cards, setCards] = useState(initialCards);
+  const [loading, setLoading] = useState(true);
+
+  // Simulate loading data
+  useEffect(() => {
+    setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+  }, []);
+
+  // Custom Search Input Component using Chakra UI
+  const CustomSearchInput = ({ searchTerm, setSearchTerm }) => {
+    const inputRef = useRef(null);
+
+    return (
+      <InputGroup size="md" maxW="400px">
+        <InputLeftElement pointerEvents="none">
+          <SearchIcon color="gray.400" />
+        </InputLeftElement>
+        <Input
+          ref={inputRef}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Find tasks..."
+          borderRadius="full"
+          bg="white"
+          borderColor="gray.300"
+        />
+        {searchTerm && (
+          <InputRightElement>
+            <IconButton
+              size="sm"
+              variant="ghost"
+              icon={<CloseIcon w={3} h={3} />}
+              onClick={() => {
+                setSearchTerm("");
+                inputRef.current?.focus();
+              }}
+              aria-label="Clear search"
+            />
+          </InputRightElement>
+        )}
+      </InputGroup>
+    );
+  };
+
+  // Custom Filter Menu Component using Chakra UI
+  const CustomFilterMenu = ({ config, selectedValue, onChange }) => {
+    const selectedOption = config.options.find(
+      (opt) => opt.value === selectedValue
+    );
+    const displayValue = selectedOption
+      ? selectedOption.label
+      : `All ${config.label}s`;
+
+    return (
+      <Box mx={2}>
+        <Text fontSize="xs" color="gray.500" mb={1}>
+          {config.label}
+        </Text>
+        <Menu closeOnSelect={true}>
+          <MenuButton
+            as={Button}
+            rightIcon={<ChevronDownIcon />}
+            size="sm"
+            variant="outline"
+            w="160px"
+          >
+            {displayValue}
+          </MenuButton>
+          <MenuList zIndex={100}>
+            <MenuItem
+              onClick={() => onChange(config.field, null)}
+              fontWeight={!selectedValue ? "bold" : "normal"}
+            >
+              All {config.label}s
+            </MenuItem>
+            <Divider />
+            {config.options.map((option) => (
+              <MenuItem
+                key={option.value}
+                onClick={() => onChange(config.field, option.value)}
+                fontWeight={selectedValue === option.value ? "bold" : "normal"}
+              >
+                {option.label}
+              </MenuItem>
+            ))}
+          </MenuList>
+        </Menu>
+      </Box>
+    );
+  };
+
+  // Wrapper functions to match the expected function signature
+  const customSearchWrapper = (searchTerm, setSearchTerm) => {
+    return (
+      <CustomSearchInput
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
       />
-    </div>
+    );
+  };
+
+  const customFilterWrapper = (config, selectedValue, onChange) => {
+    return (
+      <CustomFilterMenu
+        config={config}
+        selectedValue={selectedValue}
+        onChange={onChange}
+      />
+    );
+  };
+
+  return (
+    <ChakraProvider theme={theme}>
+      <div className="app-container">
+        <header className="app-header">
+          <h1>Project Task Board</h1>
+        </header>
+
+        <main className="board-container">
+          <KanbanBoard
+            columns={columns}
+            initialCards={cards}
+            columnForAddCard="todo"
+            isLoading={loading}
+            emptyColumnMessage="No tasks yet"
+            enableSearch={true}
+            enableFiltering={true}
+            filterConfigs={filterConfigs}
+            renderSearchInput={customSearchWrapper}
+            renderFilterMenu={customFilterWrapper}
+          />
+        </main>
+      </div>
+    </ChakraProvider>
   );
 };
 
@@ -196,35 +304,66 @@ export default App;
 
 ### KanbanBoard Component Props
 
-| Prop                  | Type                                                        | Default | Description                                                                                       |
-|-----------------------|-------------------------------------------------------------|---------|---------------------------------------------------------------------------------------------------|
-| `columns`             | `Column[]`                                                  | `[]`    | Array of columns to display. Each object should include `title`, `key`, and `color`.              |
-| `initialCards`        | `Card[]`                                                    | `[]`    | Array of cards to display initially. Each object should include `id`, `title`, `status`, and optionally `avatarPath`. |
-| `columnForAddCard`    | `string`                                                    | -       | Key of the column where new cards will be added.                                                  |
-| `onCardMove`          | `(cardId: string, newStatus: string) => void`              | -       | Callback function when a card is moved.                                                           |
-| `onCardEdit`          | `(cardId: string, newTitle: string) => void`               | -       | Callback function when a card is edited.                                                          |
-| `onCardDelete`        | `(cardId: string) => void`                                | -       | Callback function when a card is deleted.                                                         |
-| `onTaskAddedCallback` | `() => void`                                               | -       | Callback function when a new task is added.                                                       |
-| `renderCard`          | `(card: Card, handleDragStart: (e: React.DragEvent<HTMLDivElement>, card: Card) => void) => React.ReactNode` | - | Custom function to render cards.                                                                   |
-| `renderAddCard`       | `(column: string, setCards: React.Dispatch<React.SetStateAction<Card[]>>) => React.ReactNode` | - | Custom function to render the add card button.                                                     |
+| Prop                  | Type                                                                                                                                                              | Default          | Description                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `columns`             | `Column[]`                                                                                                                                                        | `[]`             | Array of columns to display. Each object should include `title`, `key`, and `color`.                                  |
+| `initialCards`        | `Card[]`                                                                                                                                                          | `[]`             | Array of cards to display initially. Each object should include `id`, `title`, `status`, and optionally `avatarPath`. |
+| `columnForAddCard`    | `string`                                                                                                                                                          | -                | Key of the column where new cards will be added.                                                                      |
+| `onCardMove`          | `(cardId: string, newStatus: string) => void`                                                                                                                     | -                | Callback function when a card is moved.                                                                               |
+| `onCardEdit`          | `(cardId: string, newTitle: string) => void`                                                                                                                      | -                | Callback function when a card is edited.                                                                              |
+| `onCardDelete`        | `(cardId: string) => void`                                                                                                                                        | -                | Callback function when a card is deleted.                                                                             |
+| `onTaskAddedCallback` | `(title: string) => void`                                                                                                                                         | -                | Callback function when a new task is added.                                                                           |
+| `renderCard`          | `(card: Card, handleDragStart: (e: React.DragEvent<HTMLDivElement>, card: Card) => void, isExpanded?: boolean, toggleExpand?: (id: string) => void) => ReactNode` | -                | Custom function to render cards.                                                                                      |
+| `renderAvatar`        | `(avatarPath?: string) => ReactNode`                                                                                                                              | -                | Custom function to render avatars.                                                                                    |
+| `renderAddCard`       | `(column: string, setCards: React.Dispatch<React.SetStateAction<Card[]>>) => ReactNode`                                                                           | -                | Custom function to render the add card button.                                                                        |
+| `isLoading`           | `boolean`                                                                                                                                                         | `false`          | Shows loading spinner when true.                                                                                      |
+| `loadingComponent`    | `ReactNode`                                                                                                                                                       | -                | Custom loading component.                                                                                             |
+| `emptyColumnMessage`  | `string`                                                                                                                                                          | `"No cards yet"` | Message to display when a column is empty.                                                                            |
+| `enableSearch`        | `boolean`                                                                                                                                                         | `false`          | Enable search functionality.                                                                                          |
+| `enableFiltering`     | `boolean`                                                                                                                                                         | `false`          | Enable filtering functionality.                                                                                       |
+| `filterConfigs`       | `FilterConfig[]`                                                                                                                                                  | `[]`             | Configuration for filters.                                                                                            |
+| `onFilterChange`      | `(filters: Record<string, string \| null>) => void`                                                                                                               | -                | Callback when filters change.                                                                                         |
+| `renderSearchInput`   | `(searchTerm: string, setSearchTerm: (term: string) => void) => ReactNode`                                                                                        | -                | Custom function to render search input.                                                                               |
+| `renderFilterMenu`    | `(config: FilterConfig, value: string \| null, handleFilterChange: (field: string, value: string \| null) => void) => ReactNode`                                  | -                | Custom function to render filter menu.                                                                                |
 
 ### Column Interface
 
-| Property | Type   | Description                             |
-|----------|--------|-----------------------------------------|
-| `title`  | `string` | Title of the column.                   |
-| `key`    | `string` | Unique key for the column.             |
-| `color`  | `string` | Background color for the column.       |
+| Property | Type     | Description                        |
+| -------- | -------- | ---------------------------------- |
+| `title`  | `string` | Title of the column.               |
+| `key`    | `string` | Unique key for the column.         |
+| `color`  | `string` | Background color for the column.   |
+| `limit`  | `number` | Optional WIP limit for the column. |
 
 ### Card Interface
 
-| Property    | Type    | Description                                      |
-|-------------|---------|--------------------------------------------------|
-| `id`        | `string` | Unique identifier for the card.                |
-| `title`     | `string` | Title of the card.                              |
-| `status`    | `string` | Status of the card, corresponds to column key.  |
-| `avatarPath`| `string` | URL to the avatar image.       |
+| Property        | Type       | Description                                     |
+| --------------- | ---------- | ----------------------------------------------- |
+| `id`            | `string`   | Unique identifier for the card.                 |
+| `title`         | `string`   | Title of the card.                              |
+| `status`        | `string`   | Status of the card, corresponds to column key.  |
+| `avatarPath`    | `string`   | URL to the avatar image.                        |
+| `priority`      | `string`   | Priority level (e.g., "High", "Medium", "Low"). |
+| `dueDate`       | `string`   | Due date for the card.                          |
+| `tags`          | `string[]` | Array of tags for the card.                     |
+| `description`   | `string`   | Detailed description of the card.               |
+| `assignee`      | `string`   | Person assigned to the card.                    |
+| `[key: string]` | `any`      | Any additional custom properties you need.      |
 
+### FilterConfig Interface
+
+| Property  | Type             | Description                                        |
+| --------- | ---------------- | -------------------------------------------------- |
+| `field`   | `string`         | Field to filter by (e.g., "priority", "assignee"). |
+| `label`   | `string`         | Display label for the filter.                      |
+| `options` | `FilterOption[]` | Array of available filter options.                 |
+
+### FilterOption Interface
+
+| Property | Type     | Description                          |
+| -------- | -------- | ------------------------------------ |
+| `value`  | `string` | Value of the filter option.          |
+| `label`  | `string` | Display label for the filter option. |
 
 ## Contributing
 
@@ -233,4 +372,3 @@ Contributions are welcome! Please open an issue or submit a pull request on GitH
 ## Contact
 
 For any questions or issues, please contact [HamdyIIbarhim](mailto:hamdyfarouk444@gmail.com).
-
