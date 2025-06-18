@@ -1,6 +1,6 @@
 {
   "name": "react-custom-kanban-board",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "A customizable Kanban board component for React with advanced features like search, filtering, and WIP limits.",
   "main": "dist/index.js",
   "module": "dist/index.js",
