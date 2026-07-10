@@ -318,7 +318,8 @@ export default App;
 | `renderAddCard`       | `(column: string, setCards: React.Dispatch<React.SetStateAction<Card[]>>) => ReactNode`                                                                           | -                | Custom function to render the add card button.                                                                        |
 | `isLoading`           | `boolean`                                                                                                                                                         | `false`          | Shows loading spinner when true.                                                                                      |
 | `loadingComponent`    | `ReactNode`                                                                                                                                                       | -                | Custom loading component.                                                                                             |
-| `emptyColumnMessage`  | `string`                                                                                                                                                          | `"No cards yet"` | Message to display when a column is empty.                                                                            |
+| `emptyColumnMessage`  | `string`                                                                                                                                                          | `"No cards yet"` | Default message shown when a column is empty (a column's `emptyMessage` overrides this).                              |
+| `renderColumnLoading` | `(column: Column) => ReactNode`                                                                                                                                   | -                | Custom per-column loading UI, shown for any column with `isLoading: true`. Falls back to a built-in skeleton.         |
 | `deleteConfirmation`  | `"immediate" \| "confirm" \| "undo"`                                                                                                                              | `"immediate"`    | Guards card deletion before `onCardDelete` fires. `confirm` shows an inline prompt; `undo` removes the card and shows a brief undo toast, deferring `onCardDelete`. |
 | `undoDuration`        | `number`                                                                                                                                                          | `5000`           | How long (ms) the undo toast stays before the delete is committed (only used with `deleteConfirmation="undo"`).       |
 | `enableSearch`        | `boolean`                                                                                                                                                         | `false`          | Enable search functionality.                                                                                          |
@@ -332,10 +333,12 @@ export default App;
 
 | Property | Type     | Description                        |
 | -------- | -------- | ---------------------------------- |
-| `title`  | `string` | Title of the column.               |
-| `key`    | `string` | Unique key for the column.         |
-| `color`  | `string` | Background color for the column.   |
-| `limit`  | `number` | Optional WIP limit for the column. |
+| `title`        | `string`  | Title of the column.                                                        |
+| `key`          | `string`  | Unique key for the column.                                                  |
+| `color`        | `string`  | Background color for the column.                                            |
+| `limit`        | `number`  | Optional WIP limit for the column.                                         |
+| `isLoading`    | `boolean` | Optional per-column loading state (e.g. lazy-loaded data). Shows a skeleton or `renderColumnLoading`. |
+| `emptyMessage` | `string`  | Optional per-column empty message; overrides the board's `emptyColumnMessage`. |
 
 ### Card Interface
 

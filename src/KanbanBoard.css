@@ -1002,6 +1002,50 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
 }
 
+/* Per-column loading skeleton */
+.column-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.column-skeleton-card {
+  height: 64px;
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 25%,
+    rgba(0, 0, 0, 0.12) 37%,
+    rgba(0, 0, 0, 0.06) 63%
+  );
+  background-size: 400% 100%;
+  animation: column-skeleton-shimmer 1.4s ease infinite;
+}
+
+.column-skeleton-card:nth-child(2) {
+  height: 88px;
+}
+
+@keyframes column-skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+[data-theme="dark"] .column-skeleton-card {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.12) 37%,
+    rgba(255, 255, 255, 0.06) 63%
+  );
+  background-size: 400% 100%;
+}
+
 /* Inline delete confirmation ("confirm" mode) */
 .delete-confirm {
   display: flex;

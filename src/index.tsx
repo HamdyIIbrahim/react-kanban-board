@@ -26,6 +26,8 @@ export interface Column {
   key: string;
   color: string;
   limit?: number; // Optional WIP limit
+  isLoading?: boolean; // Optional per-column loading state (e.g. lazy-loaded data)
+  emptyMessage?: string; // Optional per-column empty message (overrides emptyColumnMessage)
 }
 
 // New filter interfaces for dynamic filtering
@@ -107,6 +109,8 @@ interface KanbanBoardProps {
   isLoading?: boolean;
   loadingComponent?: ReactNode;
   emptyColumnMessage?: string;
+  // Custom per-column loading UI, shown when a column has isLoading set.
+  renderColumnLoading?: (column: Column) => ReactNode;
   // How to guard card deletion before onCardDelete fires. Defaults to "immediate".
   deleteConfirmation?: DeleteConfirmation;
   // How long the undo toast stays before the delete is committed (ms). Default 5000.
@@ -157,6 +161,10 @@ interface ColumnProps {
   filteredCards: Card[];
   deleteConfirmation: DeleteConfirmation;
   undoDuration: number;
+  isColumnLoading?: boolean;
+  emptyMessage?: string;
+  renderColumnLoading?: (column: Column) => ReactNode;
+  columnData: Column;
 }
 
 interface AddCardProps {
@@ -285,6 +293,15 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Default per-column loading placeholder (skeleton cards).
+const ColumnLoadingState = () => (
+  <div className="column-loading" aria-busy="true" aria-live="polite">
+    {[0, 1, 2].map((i) => (
+      <div className="column-skeleton-card" key={i} />
+    ))}
+  </div>
+);
+
 const KanbanBoard = ({
   columns,
   columnForAddCard,
@@ -299,6 +316,7 @@ const KanbanBoard = ({
   isLoading = false,
   loadingComponent,
   emptyColumnMessage = "No cards yet",
+  renderColumnLoading,
   deleteConfirmation = "immediate",
   undoDuration = 5000,
   enableSearch = false,
@@ -484,6 +502,10 @@ const KanbanBoard = ({
             emptyColumnMessage={emptyColumnMessage}
             deleteConfirmation={deleteConfirmation}
             undoDuration={undoDuration}
+            isColumnLoading={column.isLoading}
+            emptyMessage={column.emptyMessage}
+            renderColumnLoading={renderColumnLoading}
+            columnData={column}
           />
         ))}
       </div>
@@ -510,6 +532,10 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   emptyColumnMessage,
   deleteConfirmation,
   undoDuration,
+  isColumnLoading,
+  emptyMessage,
+  renderColumnLoading,
+  columnData,
 }) => {
   const [active, setActive] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -848,8 +874,18 @@ const ColumnComponent: React.FC<ColumnProps> = ({
         </div>
       </div>
       <div className={`column-content ${active ? "active" : ""}`}>
-        {filteredCards.length === 0 ? (
-          <div className="column-empty-state">{emptyColumnMessage}</div>
+        {isColumnLoading ? (
+          <div data-testid={`column-loading-${column}`}>
+            {renderColumnLoading ? (
+              renderColumnLoading(columnData)
+            ) : (
+              <ColumnLoadingState />
+            )}
+          </div>
+        ) : filteredCards.length === 0 ? (
+          <div className="column-empty-state">
+            {emptyMessage ?? emptyColumnMessage}
+          </div>
         ) : (
           <AnimatePresence>
             {filteredCards.map((card) => (

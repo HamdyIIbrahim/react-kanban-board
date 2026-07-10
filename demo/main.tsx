@@ -9,15 +9,25 @@ import KanbanBoard, {
   DeleteConfirmation,
 } from "../src/index";
 
-const deleteMode = (new URLSearchParams(window.location.search).get("delete") ||
-  "immediate") as DeleteConfirmation;
+const params = new URLSearchParams(window.location.search);
+const deleteMode = (params.get("delete") || "immediate") as DeleteConfirmation;
+const loadingCols = (params.get("loadingCols") || "").split(",").filter(Boolean);
+const emptyCols = (params.get("emptyCols") || "").split(",").filter(Boolean);
 
 const columns: Column[] = [
   { title: "To Do", key: "todo", color: "#B8C2CC" },
   { title: "In Progress", key: "in-progress", color: "#FFB1C1", limit: 3 },
   { title: "Review", key: "review", color: "#FFD580" },
-  { title: "Done", key: "done", color: "#91D18B" },
-];
+  {
+    title: "Done",
+    key: "done",
+    color: "#91D18B",
+    emptyMessage: "Nothing shipped yet 🚀",
+  },
+].map((c) => ({
+  ...c,
+  isLoading: loadingCols.includes(c.key),
+})) as Column[];
 
 const initialCards: Card[] = [
   {
@@ -141,7 +151,9 @@ const App = () => {
       <main className="board-container">
         <KanbanBoard
           columns={columns}
-          initialCards={initialCards}
+          initialCards={initialCards.filter(
+            (c) => !emptyCols.includes(c.status)
+          )}
           columnForAddCard="todo"
           emptyColumnMessage="No tasks yet"
           enableSearch={true}
@@ -151,6 +163,15 @@ const App = () => {
           onCardDelete={handleCardDelete}
           deleteConfirmation={deleteMode}
           undoDuration={3000}
+          renderColumnLoading={
+            params.get("customLoading")
+              ? (col) => (
+                  <div data-testid={`custom-loading-${col.key}`}>
+                    Loading {col.title}…
+                  </div>
+                )
+              : undefined
+          }
         />
       </main>
     </div>
