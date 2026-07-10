@@ -112,7 +112,19 @@ const filterConfigs: FilterConfig[] = [
   },
 ];
 
-const seedCards = initialCards.filter((c) => !emptyCols.includes(c.status));
+// ?bulk=N appends N generated cards to the To Do column (for perf testing).
+const bulk = params.get("bulk") ? Number(params.get("bulk")) : 0;
+const bulkCards: Card[] = Array.from({ length: bulk }, (_, i) => ({
+  id: `bulk-${i}`,
+  title: `Bulk task ${i + 1}`,
+  status: "todo",
+  priority: (["High", "Medium", "Low"] as const)[i % 3],
+  assignee: (["john", "sara", "mike"] as const)[i % 3],
+}));
+
+const seedCards = [...initialCards, ...bulkCards].filter(
+  (c) => !emptyCols.includes(c.status)
+);
 
 const App = () => {
   const [lastMove, setLastMove] = useState<string>(
@@ -159,6 +171,9 @@ const App = () => {
     onCardsChange: handleCardsChange,
     deleteConfirmation: deleteMode,
     undoDuration: 3000,
+    virtualizeColumnsOver: params.get("virtualize")
+      ? Number(params.get("virtualize"))
+      : undefined,
     renderColumnLoading: params.get("customLoading")
       ? (col: Column) => (
           <div data-testid={`custom-loading-${col.key}`}>Loading {col.title}…</div>

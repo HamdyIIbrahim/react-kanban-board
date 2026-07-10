@@ -27,6 +27,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import "./KanbanBoard.css";
 
 // Prefix used to identify a column's droppable area (vs. a card droppable).
@@ -238,6 +239,11 @@ export interface KanbanBoardProps {
   deleteConfirmation?: DeleteConfirmation;
   // How long the undo toast stays before the delete is committed (ms). Default 5000.
   undoDuration?: number;
+  // Virtualize (window) a column's card list once it exceeds this many cards.
+  // Off by default. Keeps very large columns (hundreds of cards) performant.
+  virtualizeColumnsOver?: number;
+  // Estimated card height in px, used by the virtualizer. Default 120.
+  virtualItemEstimatedHeight?: number;
   enableSearch?: boolean;
   enableFiltering?: boolean;
   filterConfigs?: FilterConfig[]; // New prop for custom filters
@@ -279,6 +285,8 @@ interface ColumnProps {
   renderColumnLoading?: (column: Column) => ReactNode;
   columnData: Column;
   isWipBlocked: boolean;
+  virtualizeColumnsOver?: number;
+  virtualItemEstimatedHeight?: number;
 }
 
 interface AddCardProps {
@@ -435,6 +443,8 @@ const KanbanBoard = ({
   renderColumnLoading,
   deleteConfirmation = "immediate",
   undoDuration = 5000,
+  virtualizeColumnsOver,
+  virtualItemEstimatedHeight = 120,
   enableSearch = false,
   enableFiltering = false,
   filterConfigs = [],
@@ -733,6 +743,8 @@ const KanbanBoard = ({
               renderColumnLoading={renderColumnLoading}
               columnData={column}
               isWipBlocked={wipBlockedColumn === column.key}
+              virtualizeColumnsOver={virtualizeColumnsOver}
+              virtualItemEstimatedHeight={virtualItemEstimatedHeight}
             />
           ))}
         </div>
@@ -796,11 +808,17 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   renderColumnLoading,
   columnData,
   isWipBlocked,
+  virtualizeColumnsOver,
+  virtualItemEstimatedHeight = 120,
 }) => {
   // Column-level droppable so empty columns and gaps still accept drops.
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: `${COLUMN_DROP_PREFIX}${column}`,
   });
+  const shouldVirtualize =
+    virtualizeColumnsOver !== undefined &&
+    !isColumnLoading &&
+    filteredCards.length > virtualizeColumnsOver;
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState<string>("");
   const [expandedCards, setExpandedCards] = useState<{
@@ -934,6 +952,119 @@ const ColumnComponent: React.FC<ColumnProps> = ({
     }
   };
 
+  // Inner content of a single card slot (card or edit box, plus any inline
+  // delete confirmation). Shared by the normal and virtualized list paths.
+  const renderSlotContent = (card: Card) => (
+    <>
+      {editingCardId === card.id ? (
+        <div className="card-edit" data-card-id={card.id}>
+          <input
+            autoFocus
+            type="text"
+            value={newTitle}
+            onChange={handleEditChange}
+            onBlur={() => handleSaveEdit(card.id)}
+            onKeyDown={(e) => handleKeyDown(e, card.id)}
+            aria-label="Edit card title"
+          />
+        </div>
+      ) : (
+        <SortableCard
+          id={card.id}
+          title={card.title}
+          virtualized={shouldVirtualize}
+        >
+          {(isDragging) =>
+            renderCard ? (
+              renderCard(card, isDragging, expandedCards[card.id], toggleExpand)
+            ) : (
+              <DefaultCard
+                {...card}
+                renderAvatar={renderAvatar}
+                isExpanded={expandedCards[card.id]}
+                isDragging={isDragging}
+                toggleExpand={() => toggleExpand(card.id)}
+                onDelete={() => handleDeleteCard(card.id)}
+                onEdit={() => handleEditClick(card.id, card.title)}
+              />
+            )
+          }
+        </SortableCard>
+      )}
+      {confirmingDeleteId === card.id && (
+        <div
+          className="delete-confirm"
+          role="alertdialog"
+          aria-label="Confirm delete"
+          data-testid={`delete-confirm-${card.id}`}
+        >
+          <span className="delete-confirm-text">Delete this card?</span>
+          <div className="delete-confirm-actions">
+            <button
+              type="button"
+              className="delete-confirm-cancel"
+              onClick={() => setConfirmingDeleteId(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="delete-confirm-delete"
+              onClick={() => handleConfirmDelete(card.id)}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  // WIP notice, undo toast and add-card control — shared by both list paths.
+  const columnFooter = (
+    <>
+      {isWipBlocked && (
+        <div
+          className="wip-limit-notification show"
+          role="status"
+          data-testid={`wip-blocked-${column}`}
+        >
+          WIP limit ({limit}) reached!
+        </div>
+      )}
+      {pendingDelete && (
+        <div
+          className="undo-toast"
+          role="status"
+          aria-live="polite"
+          data-testid={`undo-toast-${column}`}
+        >
+          <span className="undo-toast-text">Card deleted</span>
+          <button
+            type="button"
+            className="undo-toast-button"
+            onClick={handleUndoDelete}
+          >
+            Undo
+          </button>
+        </div>
+      )}
+      <div className="add-card-container">
+        {columnForAddCard === column ? (
+          renderAddCard ? (
+            renderAddCard(column, setCards)
+          ) : (
+            <DefaultAddCard
+              column={column}
+              setCards={setCards}
+              onTaskAddedCallback={onTaskAddedCallback}
+            />
+          )
+        ) : null}
+      </div>
+    </>
+  );
+
   return (
     <div
       className={`kanban-column ${isOver ? "active" : ""} ${
@@ -950,136 +1081,120 @@ const ColumnComponent: React.FC<ColumnProps> = ({
           </span>
         </div>
       </div>
-      <div
-        ref={setDroppableRef}
-        className={`column-content ${isOver ? "active" : ""}`}
-      >
-        {isColumnLoading ? (
-          <div data-testid={`column-loading-${column}`}>
-            {renderColumnLoading ? (
-              renderColumnLoading(columnData)
-            ) : (
-              <ColumnLoadingState />
-            )}
-          </div>
-        ) : filteredCards.length === 0 ? (
-          <div className="column-empty-state">
-            {emptyMessage ?? emptyColumnMessage}
-          </div>
-        ) : (
-          <SortableContext
-            items={filteredCards.map((c) => c.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            {filteredCards.map((card) => (
-              <div className="card-slot" key={card.id}>
-                {editingCardId === card.id ? (
-                  <div className="card-edit" data-card-id={card.id}>
-                    <input
-                      autoFocus
-                      type="text"
-                      value={newTitle}
-                      onChange={handleEditChange}
-                      onBlur={() => handleSaveEdit(card.id)}
-                      onKeyDown={(e) => handleKeyDown(e, card.id)}
-                      aria-label="Edit card title"
-                    />
-                  </div>
-                ) : (
-                  <SortableCard id={card.id} title={card.title}>
-                    {(isDragging) =>
-                      renderCard ? (
-                        renderCard(
-                          card,
-                          isDragging,
-                          expandedCards[card.id],
-                          toggleExpand
-                        )
-                      ) : (
-                        <DefaultCard
-                          {...card}
-                          renderAvatar={renderAvatar}
-                          isExpanded={expandedCards[card.id]}
-                          isDragging={isDragging}
-                          toggleExpand={() => toggleExpand(card.id)}
-                          onDelete={() => handleDeleteCard(card.id)}
-                          onEdit={() => handleEditClick(card.id, card.title)}
-                        />
-                      )
-                    }
-                  </SortableCard>
-                )}
-                {confirmingDeleteId === card.id && (
-                  <div
-                    className="delete-confirm"
-                    role="alertdialog"
-                    aria-label="Confirm delete"
-                    data-testid={`delete-confirm-${card.id}`}
-                  >
-                    <span className="delete-confirm-text">
-                      Delete this card?
-                    </span>
-                    <div className="delete-confirm-actions">
-                      <button
-                        type="button"
-                        className="delete-confirm-cancel"
-                        onClick={() => setConfirmingDeleteId(null)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="delete-confirm-delete"
-                        onClick={() => handleConfirmDelete(card.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </SortableContext>
-        )}
-        {isWipBlocked && (
-          <div
-            className="wip-limit-notification show"
-            role="status"
-            data-testid={`wip-blocked-${column}`}
-          >
-            WIP limit ({limit}) reached!
-          </div>
-        )}
-        {pendingDelete && (
-          <div
-            className="undo-toast"
-            role="status"
-            aria-live="polite"
-            data-testid={`undo-toast-${column}`}
-          >
-            <span className="undo-toast-text">Card deleted</span>
-            <button
-              type="button"
-              className="undo-toast-button"
-              onClick={handleUndoDelete}
+      {shouldVirtualize ? (
+        <SortableContext
+          items={filteredCards.map((c) => c.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <VirtualCardSlots
+            setDroppableRef={setDroppableRef}
+            isOver={isOver}
+            cards={filteredCards}
+            estimatedHeight={virtualItemEstimatedHeight}
+            renderSlotContent={renderSlotContent}
+          />
+          <div className="column-footer">{columnFooter}</div>
+        </SortableContext>
+      ) : (
+        <div
+          ref={setDroppableRef}
+          className={`column-content ${isOver ? "active" : ""}`}
+        >
+          {isColumnLoading ? (
+            <div data-testid={`column-loading-${column}`}>
+              {renderColumnLoading ? (
+                renderColumnLoading(columnData)
+              ) : (
+                <ColumnLoadingState />
+              )}
+            </div>
+          ) : filteredCards.length === 0 ? (
+            <div className="column-empty-state">
+              {emptyMessage ?? emptyColumnMessage}
+            </div>
+          ) : (
+            <SortableContext
+              items={filteredCards.map((c) => c.id)}
+              strategy={verticalListSortingStrategy}
             >
-              Undo
-            </button>
-          </div>
-        )}
-        <div className="add-card-container">
-          {columnForAddCard === column ? (
-            renderAddCard ? (
-              renderAddCard(column, setCards)
-            ) : (
-              <DefaultAddCard
-                column={column}
-                setCards={setCards}
-                onTaskAddedCallback={onTaskAddedCallback}
-              />
-            )
-          ) : null}
+              {filteredCards.map((card) => (
+                <div className="card-slot" key={card.id}>
+                  {renderSlotContent(card)}
+                </div>
+              ))}
+            </SortableContext>
+          )}
+          {columnFooter}
         </div>
+      )}
+    </div>
+  );
+};
+
+// Windowed card list for very large columns. Only the visible rows are
+// rendered; each is absolutely positioned by the virtualizer. The parent's
+// SortableContext still lists every card id so dnd-kit knows the full order.
+const VirtualCardSlots = ({
+  setDroppableRef,
+  isOver,
+  cards,
+  estimatedHeight,
+  renderSlotContent,
+}: {
+  setDroppableRef: (el: HTMLElement | null) => void;
+  isOver: boolean;
+  cards: Card[];
+  estimatedHeight: number;
+  renderSlotContent: (card: Card) => ReactNode;
+}) => {
+  // Own the scroll element so its ref is set before the virtualizer's effects
+  // run (a child ref is attached during its own commit); also register it as
+  // the column droppable so drops on empty space and auto-scroll work.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const setRefs = (el: HTMLDivElement | null) => {
+    scrollRef.current = el;
+    setDroppableRef(el);
+  };
+
+  const virtualizer = useVirtualizer({
+    count: cards.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => estimatedHeight,
+    overscan: 6,
+  });
+
+  return (
+    <div
+      ref={setRefs}
+      className={`column-content virtualized ${isOver ? "active" : ""}`}
+    >
+      <div
+        style={{
+          height: virtualizer.getTotalSize(),
+          position: "relative",
+          width: "100%",
+        }}
+      >
+        {virtualizer.getVirtualItems().map((vi) => {
+          const card = cards[vi.index];
+          return (
+            <div
+              key={card.id}
+              data-index={vi.index}
+              ref={virtualizer.measureElement}
+              className="card-slot virtual"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${vi.start}px)`,
+              }}
+            >
+              {renderSlotContent(card)}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1092,10 +1207,12 @@ const ColumnComponent: React.FC<ColumnProps> = ({
 const SortableCard = ({
   id,
   title,
+  virtualized,
   children,
 }: {
   id: string;
   title: string;
+  virtualized?: boolean;
   children: (isDragging: boolean) => ReactNode;
 }) => {
   const {
@@ -1107,11 +1224,15 @@ const SortableCard = ({
     isDragging,
   } = useSortable({ id });
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : undefined,
-  };
+  // In virtualized columns the row is positioned by the virtualizer, so we skip
+  // dnd-kit's sort transform/transition (which would fight it).
+  const style: React.CSSProperties = virtualized
+    ? { opacity: isDragging ? 0.4 : undefined }
+    : {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : undefined,
+      };
 
   return (
     <div

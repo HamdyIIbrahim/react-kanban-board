@@ -1032,6 +1032,16 @@
   position: relative;
 }
 
+/* Virtualized column: the content area becomes the scroll container */
+.column-content.virtualized {
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+.card-slot.virtual {
+  padding: 0 2px;
+}
+
 /* Per-column loading skeleton */
 .column-loading {
   display: flex;

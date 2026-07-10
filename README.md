@@ -300,6 +300,36 @@ const App = () => {
 export default App;
 ```
 
+## Virtualization (experimental)
+
+For boards with very large columns (hundreds of cards), set
+`virtualizeColumnsOver` to window each column's list so only the visible cards
+are rendered. It's **off by default** and fully non-breaking.
+
+```jsx
+<KanbanBoard
+  columns={columns}
+  initialCards={cards}
+  columnForAddCard="todo"
+  virtualizeColumnsOver={50} // window any column with > 50 cards
+  virtualItemEstimatedHeight={120}
+/>
+```
+
+In testing, a 300-card column dropped from ~6,200 DOM nodes to ~350 (only ~13
+cards rendered). Drag-and-drop (mouse, touch, keyboard) keeps working for
+visible cards, and the `onCardMove` / `DropPosition` contract is unchanged.
+
+> **⚠️ Caveats (why it's experimental):**
+>
+> - **No auto-scroll to off-screen targets while dragging.** You can reorder
+>   among the cards currently in view, but you can't drag a card to a position
+>   that's scrolled out of view in one motion — scroll to the target area first,
+>   then drag. (Auto-scroll-during-drag for windowed columns is planned.)
+> - No live "make room" shift animation inside virtualized columns.
+> - Best for read-heavy large boards; if you need long-distance drags across a
+>   huge column, leave virtualization off for that board.
+
 ## Controlled vs. uncontrolled
 
 The board works in two modes:
@@ -375,6 +405,8 @@ regular `KanbanBoard`.
 | `emptyColumnMessage`  | `string`                                                                                                                                                          | `"No cards yet"` | Default message shown when a column is empty (a column's `emptyMessage` overrides this).                              |
 | `renderColumnLoading` | `(column: Column) => ReactNode`                                                                                                                                   | -                | Custom per-column loading UI, shown for any column with `isLoading: true`. Falls back to a built-in skeleton.         |
 | `deleteConfirmation`  | `"immediate" \| "confirm" \| "undo"`                                                                                                                              | `"immediate"`    | Guards card deletion before `onCardDelete` fires. `confirm` shows an inline prompt; `undo` removes the card and shows a brief undo toast, deferring `onCardDelete`. |
+| `virtualizeColumnsOver` | `number`                                                                                                                                                        | -                | **Experimental.** Virtualize (window) a column's list once it exceeds this many cards, for large-board performance. See [Virtualization](#virtualization-experimental) for caveats. |
+| `virtualItemEstimatedHeight` | `number`                                                                                                                                                   | `120`            | Estimated card height (px) used by the virtualizer.                                                                  |
 | `undoDuration`        | `number`                                                                                                                                                          | `5000`           | How long (ms) the undo toast stays before the delete is committed (only used with `deleteConfirmation="undo"`).       |
 | `enableSearch`        | `boolean`                                                                                                                                                         | `false`          | Enable search functionality.                                                                                          |
 | `enableFiltering`     | `boolean`                                                                                                                                                         | `false`          | Enable filtering functionality.                                                                                       |
