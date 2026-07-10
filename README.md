@@ -300,6 +300,40 @@ const App = () => {
 export default App;
 ```
 
+## Backend persistence (optimistic + rollback)
+
+The `usePersistentBoard` hook wires a controlled board to a backend: mutations
+apply instantly (optimistic), and if a backend call rejects, the board rolls
+back to the previous state and calls `onError`.
+
+```jsx
+import { usePersistentBoard, ControlledKanbanBoard } from "react-custom-kanban-board";
+
+function Board() {
+  const board = usePersistentBoard(initialCards, {
+    onCardMove: (id, status, pos) => api.moveCard(id, status, pos),
+    onCardEdit: (id, title) => api.renameCard(id, title),
+    onCardDelete: (id) => api.deleteCard(id),
+    onError: () => toast("Couldn't save — reverted"),
+  });
+
+  return (
+    <ControlledKanbanBoard
+      columns={columns}
+      columnForAddCard="todo"
+      cards={board.cards}
+      onCardsChange={board.onCardsChange}
+      onCardMove={board.onCardMove}
+      onCardEdit={board.onCardEdit}
+      onCardDelete={board.onCardDelete}
+    />
+  );
+}
+```
+
+`board.isSyncing` is `true` while a backend call is in flight. Each adapter
+method returns a `Promise`; a rejection triggers the rollback.
+
 ## Export / import
 
 Pure helpers to snapshot or migrate a board's cards as JSON or CSV (no React

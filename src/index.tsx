@@ -40,6 +40,11 @@ export {
   importCardsFromJSON,
   importCardsFromCSV,
 } from "./serialize";
+export { usePersistentBoard } from "./usePersistentBoard";
+export type {
+  PersistenceAdapter,
+  PersistentBoard,
+} from "./usePersistentBoard";
 
 // Prefix used to identify a column's droppable area (vs. a card droppable).
 const COLUMN_DROP_PREFIX = "column:";

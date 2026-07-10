@@ -12,6 +12,8 @@ import KanbanBoard, {
   exportCardsToCSV,
   importCardsFromJSON,
   importCardsFromCSV,
+  usePersistentBoard,
+  PersistenceAdapter,
 } from "../src/index";
 import "./showcase.css";
 
@@ -334,6 +336,9 @@ const App = () => {
   const [columnReorder, setColumnReorder] = useState(
     params.get("columnReorder") === "1"
   );
+  const [persistMode, setPersistMode] = useState(
+    params.get("persist") || "off"
+  );
   const [virtualizeOver, setVirtualizeOver] = useState<number | undefined>(
     initialVirtualize
   );
@@ -370,6 +375,20 @@ const App = () => {
     setEvents((prev) =>
       [{ id: evtId.current++, kind, time: now(), data }, ...prev].slice(0, 14)
     );
+
+  // Fake backend: succeeds after a short delay, or rejects when persist=fail.
+  const persistAdapter: PersistenceAdapter = {
+    onCardMove: async () => {
+      await new Promise((r) => window.setTimeout(r, 250));
+      if (persistMode === "fail") throw new Error("backend rejected the move");
+    },
+    onError: (e) => {
+      // eslint-disable-next-line no-console
+      console.log("onPersistError:", (e as Error).message);
+      push("delete", { cardId: "↩ reverted (rollback)" });
+    },
+  };
+  const persisted = usePersistentBoard(seed, persistAdapter);
 
   const handleCardMove = (
     cardId: string,
@@ -569,6 +588,25 @@ const App = () => {
         </div>
 
         <div className="ctl">
+          <span className="ctl-label">Persistence</span>
+          <div className="seg">
+            {[
+              ["off", "Off"],
+              ["ok", "Sync OK"],
+              ["fail", "Sync Fails"],
+            ].map(([m, label]) => (
+              <button
+                key={m}
+                data-active={persistMode === m}
+                onClick={() => setPersistMode(m)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="ctl">
           <span className="ctl-label">Delete behavior</span>
           <div className="seg">
             {(["immediate", "confirm", "undo"] as DeleteConfirmation[]).map(
@@ -690,7 +728,29 @@ const App = () => {
             theme === "dark" ? "is-dark" : ""
           }`}
         >
-          {view === "table" ? (
+          {persistMode !== "off" ? (
+            <ControlledKanbanBoard
+              key={`p-${persistMode}`}
+              {...commonProps}
+              cards={persisted.cards}
+              onCardsChange={(next) => {
+                // eslint-disable-next-line no-console
+                console.log(
+                  "onCardsChange:",
+                  next.map((c) => `${c.id}:${c.status}`).join(",")
+                );
+                persisted.onCardsChange(next);
+              }}
+              onCardMove={(id, s, p) => {
+                handleCardMove(id, s, p);
+                persisted.onCardMove(id, s, p);
+              }}
+              onCardDelete={(id) => {
+                handleCardDelete(id);
+                persisted.onCardDelete(id);
+              }}
+            />
+          ) : view === "table" ? (
             <TableView
               cards={isControlled ? ctrlCards : seed}
               columns={columns}

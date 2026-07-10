@@ -8,6 +8,10 @@ const columnKeys = (page: Page) =>
 
 // Drag column `fromKey`'s grip onto column `toKey`.
 async function dragColumn(page: Page, fromKey: string, toKey: string) {
+  await page
+    .locator(`[data-testid="column-grip-${fromKey}"]`)
+    .scrollIntoViewIfNeeded()
+    .catch(() => {});
   const grip = (await page
     .locator(`[data-testid="column-grip-${fromKey}"]`)
     .boundingBox())!;

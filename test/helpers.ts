@@ -151,6 +151,7 @@ export interface ConsoleCapture {
   deletes: string[];
   changes: string[];
   columns: string[];
+  persistErrors: string[];
 }
 
 /**
@@ -163,6 +164,7 @@ export function captureConsole(page: Page): ConsoleCapture {
     deletes: [],
     changes: [],
     columns: [],
+    persistErrors: [],
   };
   page.on("console", async (msg) => {
     const text = msg.text();
@@ -178,6 +180,8 @@ export function captureConsole(page: Page): ConsoleCapture {
       cap.changes.push(text.replace("onCardsChange:", "").trim());
     } else if (text.startsWith("onColumnsReorder:")) {
       cap.columns.push(text.replace("onColumnsReorder:", "").trim());
+    } else if (text.startsWith("onPersistError:")) {
+      cap.persistErrors.push(text.replace("onPersistError:", "").trim());
     }
   });
   return cap;
