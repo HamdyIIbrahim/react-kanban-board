@@ -7,6 +7,7 @@ import KanbanBoard, {
   FilterConfig,
   DropPosition,
   DeleteConfirmation,
+  CardFieldDef,
   ControlledKanbanBoard,
   exportCardsToJSON,
   exportCardsToCSV,
@@ -69,6 +70,8 @@ const baseCards: Card[] = [
     tags: ["frontend", "auth"],
     description: "Implement user registration, login, and password reset flows.",
     assignee: "john",
+    storyPoints: 8,
+    epic: "auth",
   },
   {
     id: "2",
@@ -113,6 +116,21 @@ const baseCards: Card[] = [
     tags: ["frontend"],
     description: "Ship the marketing landing page to production.",
     assignee: "john",
+  },
+];
+
+// Typed custom-field schema (rendered in card details, validatable).
+const cardFields: CardFieldDef[] = [
+  { key: "storyPoints", label: "Story points", type: "number" },
+  {
+    key: "epic",
+    label: "Epic",
+    type: "select",
+    options: [
+      { value: "auth", label: "Authentication" },
+      { value: "infra", label: "Infrastructure" },
+      { value: "growth", label: "Growth" },
+    ],
   },
 ];
 
@@ -468,6 +486,7 @@ const App = () => {
     onCardsChange: handleCardsChange,
     deleteConfirmation: deleteMode,
     undoDuration: 3000,
+    cardFields,
     className: theme === "dark" ? "kb-dark" : undefined,
     enableMultiSelect: multiSelect,
     onBulkMove: (ids: string[], status: string) => {

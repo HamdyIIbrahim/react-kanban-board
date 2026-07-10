@@ -39,6 +39,7 @@ export {
   exportCardsToCSV,
   importCardsFromJSON,
   importCardsFromCSV,
+  validateCard,
 } from "./serialize";
 export { usePersistentBoard } from "./usePersistentBoard";
 export type {
@@ -188,6 +189,18 @@ export interface FilterConfig {
   options: FilterOption[];
 }
 
+// Describes a custom card field beyond the built-in ones, so consumers get a
+// typed schema instead of relying on the loose `[key: string]: any`. Schema
+// fields are rendered in the default card's expanded details and can be
+// validated with `validateCard`.
+export interface CardFieldDef {
+  key: string;
+  label: string;
+  type?: "text" | "number" | "date" | "select" | "tags";
+  options?: FilterOption[]; // for type: "select"
+  required?: boolean;
+}
+
 // How a card deletion is guarded before onCardDelete is fired.
 // - "immediate": fire onCardDelete right away (default, backwards compatible)
 // - "confirm":   show an inline confirmation prompt first
@@ -225,6 +238,8 @@ interface DefaultCardProps {
   onEdit?: (id: string) => void;
   isDragging?: boolean; // true for the source card while it is being dragged
   isOverlay?: boolean; // true when rendered inside the DragOverlay preview
+  card?: Card; // full card, for reading schema field values
+  cardFields?: CardFieldDef[]; // custom field schema to render in details
 }
 
 // Signature for custom card renderers. `isDragging` is true for the card being
@@ -274,6 +289,8 @@ export interface KanbanBoardProps {
   deleteConfirmation?: DeleteConfirmation;
   // How long the undo toast stays before the delete is committed (ms). Default 5000.
   undoDuration?: number;
+  // Optional typed schema for custom card fields; rendered in card details.
+  cardFields?: CardFieldDef[];
   // Enable drag-to-reorder of columns (via a grip in each column header).
   // Off by default.
   enableColumnReorder?: boolean;
@@ -342,6 +359,7 @@ interface ColumnProps {
     e: React.MouseEvent,
     columnCardIds: string[]
   ) => void;
+  cardFields?: CardFieldDef[];
 }
 
 interface AddCardProps {
@@ -500,6 +518,7 @@ const KanbanBoard = ({
   renderColumnLoading,
   deleteConfirmation = "immediate",
   undoDuration = 5000,
+  cardFields,
   enableColumnReorder = false,
   onColumnsReorder,
   enableMultiSelect = false,
@@ -807,6 +826,7 @@ const KanbanBoard = ({
       enableMultiSelect={enableMultiSelect}
       selectedIds={selectedIds}
       onToggleSelect={handleToggleSelect}
+      cardFields={cardFields}
     />
   );
 
@@ -1036,6 +1056,7 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   enableMultiSelect,
   selectedIds,
   onToggleSelect,
+  cardFields,
 }) => {
   // Column-level droppable so empty columns and gaps still accept drops.
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -1217,6 +1238,8 @@ const ColumnComponent: React.FC<ColumnProps> = ({
             ) : (
               <DefaultCard
                 {...card}
+                card={card}
+                cardFields={cardFields}
                 renderAvatar={renderAvatar}
                 isExpanded={expandedCards[card.id]}
                 isDragging={isDragging}
@@ -1557,9 +1580,18 @@ const DefaultCard = ({
   onEdit,
   isDragging,
   isOverlay,
+  card,
+  cardFields,
 }: DefaultCardProps) => {
+  const schemaFields = (cardFields || []).filter(
+    (f) => card && card[f.key] !== undefined && card[f.key] !== ""
+  );
   const hasDetails =
-    priority || dueDate || description || (tags && tags.length > 0);
+    priority ||
+    dueDate ||
+    description ||
+    (tags && tags.length > 0) ||
+    schemaFields.length > 0;
 
   // Priority accent is applied via a themeable CSS class (see --kb-priority-*).
   const priorityClass = priority ? `kb-pri-${priority.toLowerCase()}` : "";
@@ -1641,6 +1673,23 @@ const DefaultCard = ({
               ))}
             </div>
           )}
+
+          {schemaFields.map((f) => {
+            const value = card ? card[f.key] : undefined;
+            return (
+              <div className="card-detail" key={f.key} data-field={f.key}>
+                <span className="detail-label">{f.label}:</span>
+                <span className="detail-value">
+                  {f.type === "tags" && Array.isArray(value)
+                    ? value.join(", ")
+                    : f.type === "select"
+                    ? f.options?.find((o) => o.value === value)?.label ??
+                      String(value)
+                    : String(value)}
+                </span>
+              </div>
+            );
+          })}
         </motion.div>
       )}
 

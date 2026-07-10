@@ -29,6 +29,7 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | `renderColumnLoading` | `(column: Column) => ReactNode` | No | Custom per-column loading UI, shown when a column has isLoading set. |
 | `deleteConfirmation` | `DeleteConfirmation` | No | How to guard card deletion before onCardDelete fires. Defaults to "immediate". |
 | `undoDuration` | `number` | No | How long the undo toast stays before the delete is committed (ms). Default 5000. |
+| `cardFields` | `CardFieldDef[]` | No | Optional typed schema for custom card fields; rendered in card details. |
 | `enableColumnReorder` | `boolean` | No | Enable drag-to-reorder of columns (via a grip in each column header). Off by default. |
 | `onColumnsReorder` | `(orderedKeys: string[]) => void` | No | Called with the new ordered column keys after a column is reordered. |
 | `enableMultiSelect` | `boolean` | No | Enable multi-select (Cmd/Ctrl-click to toggle, Shift-click for a range) with a bulk action bar. Off by default. |
@@ -75,6 +76,16 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | `prevTaskId` | `string \| null` | Yes | Id of the card immediately before the dropped card in the destination column, or null if it was dropped at the top. |
 | `nextTaskId` | `string \| null` | Yes | Id of the card immediately after the dropped card in the destination column, or null if it was dropped at the bottom. |
 | `index` | `number` | Yes | Zero-based index of the dropped card within the destination column. |
+
+### CardFieldDef
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `key` | `string` | Yes |  |
+| `label` | `string` | Yes |  |
+| `type` | `"text" \| "number" \| "date" \| "select" \| "tags"` | No |  |
+| `options` | `FilterOption[]` | No | for type: "select" |
+| `required` | `boolean` | No |  |
 
 ### FilterConfig
 

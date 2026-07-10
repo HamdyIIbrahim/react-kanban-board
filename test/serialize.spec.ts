@@ -4,8 +4,9 @@ import {
   importCardsFromJSON,
   exportCardsToCSV,
   importCardsFromCSV,
+  validateCard,
 } from "../src/serialize";
-import type { Card } from "../src/index";
+import type { Card, CardFieldDef } from "../src/index";
 
 const cards: Card[] = [
   {
@@ -57,5 +58,45 @@ test.describe("serialize (export/import)", () => {
     expect(() => importCardsFromCSV("foo,bar\n1,2")).toThrow(
       /id, title and status/
     );
+  });
+});
+
+test.describe("validateCard (field schema)", () => {
+  const fields: CardFieldDef[] = [
+    { key: "storyPoints", label: "Story points", type: "number" },
+    {
+      key: "epic",
+      label: "Epic",
+      type: "select",
+      options: [{ value: "auth", label: "Authentication" }],
+      required: true,
+    },
+    { key: "due", label: "Due", type: "date" },
+  ];
+
+  test("passes a valid card", () => {
+    const card: Card = {
+      id: "1",
+      title: "x",
+      status: "todo",
+      storyPoints: 5,
+      epic: "auth",
+      due: "2026-08-01",
+    };
+    expect(validateCard(card, fields)).toEqual([]);
+  });
+
+  test("reports type, option, required and date errors", () => {
+    const card: Card = {
+      id: "1",
+      title: "x",
+      status: "todo",
+      storyPoints: "abc",
+      due: "not-a-date",
+    };
+    const errors = validateCard(card, fields);
+    expect(errors).toContain("Story points must be a number");
+    expect(errors).toContain("Epic is required");
+    expect(errors).toContain("Due must be a valid date");
   });
 });

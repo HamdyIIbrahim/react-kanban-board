@@ -300,6 +300,38 @@ const App = () => {
 export default App;
 ```
 
+## Custom card fields (typed schema)
+
+Beyond the built-in `priority` / `dueDate` / `tags` / `assignee`, describe your
+own fields with a typed schema. They render in the default card's expanded
+details and can be validated with `validateCard`.
+
+```jsx
+import { validateCard } from "react-custom-kanban-board";
+
+const cardFields = [
+  { key: "storyPoints", label: "Story points", type: "number" },
+  {
+    key: "epic",
+    label: "Epic",
+    type: "select",
+    options: [
+      { value: "auth", label: "Authentication" },
+      { value: "infra", label: "Infrastructure" },
+    ],
+    required: true,
+  },
+];
+
+<KanbanBoard columns={columns} initialCards={cards} columnForAddCard="todo" cardFields={cardFields} />;
+
+// Validate before saving:
+const errors = validateCard(card, cardFields); // string[] (empty = valid)
+```
+
+For full type-safety, extend `Card` with your fields:
+`interface MyCard extends Card { storyPoints: number; epic: string }`.
+
 ## Backend persistence (optimistic + rollback)
 
 The `usePersistentBoard` hook wires a controlled board to a backend: mutations

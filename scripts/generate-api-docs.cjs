@@ -21,6 +21,7 @@ const INTERFACES = [
   ["Column", "Column"],
   ["Card", "Card"],
   ["DropPosition", "DropPosition"],
+  ["CardFieldDef", "CardFieldDef"],
   ["FilterConfig", "FilterConfig"],
   ["FilterOption", "FilterOption"],
 ];

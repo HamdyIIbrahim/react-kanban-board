@@ -3,7 +3,36 @@
  * dnd-kit dependencies, so they can be used anywhere (browser or server) and
  * unit-tested in isolation.
  */
-import type { Card } from "./index";
+import type { Card, CardFieldDef } from "./index";
+
+/**
+ * Validate a card against a custom field schema. Returns an array of
+ * human-readable error messages (empty when valid).
+ */
+export function validateCard(card: Card, fields: CardFieldDef[]): string[] {
+  const errors: string[] = [];
+  for (const f of fields) {
+    const v = (card as any)[f.key];
+    const missing = v === undefined || v === null || v === "";
+    if (f.required && missing) {
+      errors.push(`${f.label} is required`);
+      continue;
+    }
+    if (missing) continue;
+    if (f.type === "number" && isNaN(Number(v))) {
+      errors.push(`${f.label} must be a number`);
+    } else if (
+      f.type === "select" &&
+      f.options &&
+      !f.options.some((o) => o.value === v)
+    ) {
+      errors.push(`${f.label} is not a valid option`);
+    } else if (f.type === "date" && isNaN(Date.parse(String(v)))) {
+      errors.push(`${f.label} must be a valid date`);
+    }
+  }
+  return errors;
+}
 
 // Fixed columns exported first; any extra scalar card fields follow (sorted).
 const CORE_FIELDS = [
