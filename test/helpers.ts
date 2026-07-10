@@ -15,6 +15,11 @@ export async function drag(
   columnKey: string,
   beforeId: string
 ): Promise<void> {
+  // Mouse dragging needs the card physically in the viewport.
+  await page
+    .locator(`[data-card-id="${cardId}"]`)
+    .scrollIntoViewIfNeeded()
+    .catch(() => {});
   const src = await page.locator(`[data-card-id="${cardId}"]`).boundingBox();
   if (!src) throw new Error(`drag: source card ${cardId} not found`);
 
