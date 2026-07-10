@@ -7,6 +7,7 @@
   "types": "dist/index.d.ts",
   "sideEffects": false,
   "scripts": {
+    "dev": "vite",
     "clean": "rimraf dist",
     "build": "npm run clean && tsc && npm run build:css",
     "build:css": "postcss src/KanbanBoard.css -o dist/KanbanBoard.css",
@@ -21,11 +22,13 @@
   "devDependencies": {
     "@types/react": "^16.* || ^17.* || ^18.* || ^19.*",
     "@types/react-dom": "^16.* || ^17.* || ^18.* || ^19.*",
+    "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.21",
     "postcss-cli": "^10.1.0",
     "rimraf": "^5.0.0",
-    "typescript": "^4.9.0 || ^5.0.0"
+    "typescript": "^4.9.0 || ^5.0.0",
+    "vite": "^8.1.4"
   },
   "peerDependencies": {
     "react": "^16.* || ^17.* || ^18.* || ^19.*",
