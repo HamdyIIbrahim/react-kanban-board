@@ -300,6 +300,48 @@ const App = () => {
 export default App;
 ```
 
+## Theming
+
+The board is styled entirely through `--kb-*` CSS variables (design tokens), so
+you can reskin it without fighting selector specificity. Override them globally
+on `:root`, or scope them to one board via the `className` / `style` props.
+
+A ready-made dark theme ships as `.kb-dark`:
+
+```jsx
+<KanbanBoard className="kb-dark" columns={columns} initialCards={cards} columnForAddCard="todo" />
+```
+
+Or set your own tokens inline / in a scoped class:
+
+```jsx
+<KanbanBoard
+  columns={columns}
+  initialCards={cards}
+  columnForAddCard="todo"
+  style={{
+    ["--kb-accent"]: "#7c3aed",
+    ["--kb-card-radius"]: "16px",
+    ["--kb-priority-high"]: "#e11d48",
+  }}
+/>
+```
+
+Key tokens (see `src/KanbanBoard.css` for the full set):
+
+| Token | Purpose |
+| --- | --- |
+| `--kb-board-bg` / `--kb-column-bg` / `--kb-card-bg` | Surfaces |
+| `--kb-text` / `--kb-text-muted` | Text |
+| `--kb-accent` / `--kb-hover-bg` | Accent & interaction |
+| `--kb-border` / `--kb-radius` / `--kb-card-radius` | Lines & radii |
+| `--kb-shadow` / `--kb-shadow-hover` | Elevation |
+| `--kb-priority-high` / `--kb-priority-medium` / `--kb-priority-low` | Priority accents |
+| `--kb-font` | Font family |
+
+> Previous variable names (`--card-bg`, `--accent-color`, …) still work as
+> aliases, so existing overrides keep functioning.
+
 ## Virtualization (experimental)
 
 For boards with very large columns (hundreds of cards), set
@@ -392,6 +434,8 @@ regular `KanbanBoard`.
 | `initialCards`        | `Card[]`                                                                                                                                                          | `[]`             | **Uncontrolled mode.** Seeds the board's internal card state once, on mount. Later changes to this prop are ignored (see [Controlled vs. uncontrolled](#controlled-vs-uncontrolled)). |
 | `cards`               | `Card[]`                                                                                                                                                          | -                | **Controlled mode.** When provided, the board renders these cards directly and never mutates internal state. Pair with `onCardsChange`. |
 | `onCardsChange`       | `(cards: Card[]) => void`                                                                                                                                         | -                | Called with the full next card list on every mutation (move, edit, delete, add). Required for controlled mode; also fires in uncontrolled mode. |
+| `className`           | `string`                                                                                                                                                          | -                | Applied to the board root — use it to scope a theme (e.g. `"kb-dark"`). See [Theming](#theming). |
+| `style`               | `React.CSSProperties`                                                                                                                                             | -                | Applied to the board root — handy for setting `--kb-*` tokens inline.                                |
 | `columnForAddCard`    | `string`                                                                                                                                                          | -                | Key of the column where new cards will be added.                                                                      |
 | `onCardMove`          | `(cardId: string, newStatus: string, position: DropPosition) => void`                                                                                             | -                | Callback when a card is moved. Fires for both cross-column moves **and** same-column reordering. `position` exposes where the card landed within the destination column. |
 | `onCardEdit`          | `(cardId: string, newTitle: string) => void`                                                                                                                      | -                | Callback function when a card is edited.                                                                              |

@@ -341,6 +341,13 @@ body {
   background: transparent;
 }
 
+/* Dark theme: let the canvas frame match the dark board */
+.board-canvas.is-dark {
+  background: var(--ink-2);
+  border-color: var(--line);
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.8);
+}
+
 /* Event rail */
 .rail {
   position: sticky;

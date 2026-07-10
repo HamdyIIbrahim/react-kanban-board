@@ -308,6 +308,9 @@ type Evt = {
 
 const App = () => {
   const [view, setView] = useState<ViewKind>(initialView);
+  const [theme, setTheme] = useState<"light" | "dark">(
+    params.get("theme") === "dark" ? "dark" : "light"
+  );
   const [deleteMode, setDeleteMode] = useState<DeleteConfirmation>(initialDelete);
   const [mode, setMode] = useState(initialMode);
   const [loadingSet, setLoadingSet] = useState<Set<string>>(
@@ -405,6 +408,7 @@ const App = () => {
     onCardsChange: handleCardsChange,
     deleteConfirmation: deleteMode,
     undoDuration: 3000,
+    className: theme === "dark" ? "kb-dark" : undefined,
     virtualizeColumnsOver: virtualizeOver,
     renderCard:
       view === "crm" ? crmCard : view === "compact" ? compactCard : undefined,
@@ -481,6 +485,24 @@ const App = () => {
                 {label}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="ctl">
+          <span className="ctl-label">Theme</span>
+          <div className="seg">
+            <button
+              data-active={theme === "light"}
+              onClick={() => setTheme("light")}
+            >
+              Light
+            </button>
+            <button
+              data-active={theme === "dark"}
+              onClick={() => setTheme("dark")}
+            >
+              Dark
+            </button>
           </div>
         </div>
 
@@ -573,7 +595,11 @@ const App = () => {
       </section>
 
       <div className="stage">
-        <main className={`board-canvas ${view === "table" ? "is-table" : ""}`}>
+        <main
+          className={`board-canvas ${view === "table" ? "is-table" : ""} ${
+            theme === "dark" ? "is-dark" : ""
+          }`}
+        >
           {view === "table" ? (
             <TableView
               cards={isControlled ? ctrlCards : seed}

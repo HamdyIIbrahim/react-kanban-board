@@ -215,6 +215,10 @@ export interface KanbanBoardProps {
   // Called with the full next card list on every internal mutation (move, edit,
   // delete, add). Required for controlled mode; also fires in uncontrolled mode.
   onCardsChange?: (cards: Card[]) => void;
+  // Applied to the board root — use it to scope a theme (e.g. "kb-dark") or set
+  // --kb-* CSS variables via `style`.
+  className?: string;
+  style?: React.CSSProperties;
   columnForAddCard: string;
   onCardMove?: (
     cardId: string,
@@ -430,6 +434,8 @@ const KanbanBoard = ({
   initialCards = [],
   cards: controlledCards,
   onCardsChange,
+  className,
+  style,
   onCardMove,
   onCardEdit,
   onCardDelete,
@@ -616,14 +622,18 @@ const KanbanBoard = ({
 
   if (isLoading) {
     return (
-      <div className="kanban-board-container">
+      <div className={`kanban-board-container ${className || ""}`} style={style}>
         {loadingComponent || <LoadingSpinner />}
       </div>
     );
   }
 
   return (
-    <div className="kanban-board-container" ref={boardRef}>
+    <div
+      className={`kanban-board-container ${className || ""}`}
+      style={style}
+      ref={boardRef}
+    >
       {(enableSearch || (enableFiltering && filterConfigs.length > 0)) && (
         <div className="kanban-search">
           {enableSearch && (
@@ -750,7 +760,7 @@ const KanbanBoard = ({
         </div>
         <DragOverlay dropAnimation={null}>
           {activeCard ? (
-            <div className="card-drag-overlay">
+            <div className={`card-drag-overlay ${className || ""}`}>
               {renderCard ? (
                 renderCard(activeCard, undefined, undefined, undefined)
               ) : (
@@ -1269,24 +1279,14 @@ const DefaultCard = ({
   const hasDetails =
     priority || dueDate || description || (tags && tags.length > 0);
 
-  // Priority color mapping
-  const priorityColors = {
-    High: "#F87171",
-    Medium: "#FBBF24",
-    Low: "#34D399",
-  };
-
-  // Get border color based on priority
-  const borderColor = priority ? priorityColors[priority] : undefined;
+  // Priority accent is applied via a themeable CSS class (see --kb-priority-*).
+  const priorityClass = priority ? `kb-pri-${priority.toLowerCase()}` : "";
 
   return (
     <div
-      className={`card ${isExpanded ? "expanded" : ""} ${
+      className={`card ${priorityClass} ${isExpanded ? "expanded" : ""} ${
         isDragging ? "dragging" : ""
       } ${isOverlay ? "overlay" : ""}`}
-      style={{
-        borderLeft: borderColor ? `4px solid ${borderColor}` : undefined,
-      }}
       role="article"
       aria-label={`Card: ${title}`}
     >

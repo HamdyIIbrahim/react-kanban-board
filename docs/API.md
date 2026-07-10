@@ -13,6 +13,8 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | `initialCards` | `Card[]` | No | Uncontrolled mode: the board owns card state, seeded once from initialCards. |
 | `cards` | `Card[]` | No | Controlled mode: when provided, the board renders these cards directly and never mutates internal state. Pair with onCardsChange to receive updates. |
 | `onCardsChange` | `(cards: Card[]) => void` | No | Called with the full next card list on every internal mutation (move, edit, delete, add). Required for controlled mode; also fires in uncontrolled mode. |
+| `className` | `string` | No | Applied to the board root — use it to scope a theme (e.g. "kb-dark") or set --kb-* CSS variables via `style`. |
+| `style` | `React.CSSProperties` | No |  |
 | `columnForAddCard` | `string` | Yes |  |
 | `onCardMove` | `( cardId: string, newStatus: string, position: DropPosition ) => void` | No |  |
 | `onCardEdit` | `(cardId: string, newTitle: string) => void` | No |  |
