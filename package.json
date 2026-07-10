@@ -1,7 +1,7 @@
 {
   "name": "react-custom-kanban-board",
-  "version": "2.0.0",
-  "description": "A customizable Kanban board component for React with advanced features like search, filtering, and WIP limits.",
+  "version": "3.0.0",
+  "description": "A customizable Kanban board component for React with touch + keyboard accessible drag-and-drop, controlled/uncontrolled state, search, filtering, and WIP limits.",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -50,7 +50,8 @@
   },
   "files": [
     "dist/**/*",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "kanban-board",
