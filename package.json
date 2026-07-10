@@ -19,6 +19,9 @@
     "prepare": "npm run build"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "framer-motion": "^11.3.30",
     "react": "^16.* || ^17.* || ^18.* || ^19.*",
     "react-dom": "^16.* || ^17.* || ^18.* || ^19.*"

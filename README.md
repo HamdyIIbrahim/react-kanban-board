@@ -11,7 +11,7 @@ Here are some visual examples of the Kanban board component:
 
 ## Features
 
-- **Drag and Drop Functionality:** Move task cards between columns with ease
+- **Drag and Drop Functionality:** Move task cards between columns with mouse, touch, or keyboard (powered by [dnd-kit](https://dndkit.com/))
 - **Customizable Card Rendering:** Tailor the appearance of task cards to fit your design
 - **Add, Edit, and Delete Tasks:** Manage tasks directly from the Kanban board
 - **Support for Avatars:** Display avatars on task cards for better team representation
@@ -22,8 +22,8 @@ Here are some visual examples of the Kanban board component:
 - **Dynamic Filtering:** Filter cards by various properties (priority, assignee, status)
 - **Search Functionality:** Search for cards by title
 - **UI Library Integration:** Seamlessly integrate with popular UI libraries like Chakra UI
-- **Responsive Design:** Works on desktop and mobile devices
-- **Accessibility Features:** Built with accessibility in mind
+- **Responsive Design:** Works on desktop and mobile devices — touch dragging with press-and-hold
+- **Keyboard Accessible Drag-and-Drop:** Focus a card, press <kbd>Space</kbd> to pick it up, arrow keys to move (including across columns), <kbd>Space</kbd>/<kbd>Enter</kbd> to drop, <kbd>Esc</kbd> to cancel — with screen-reader announcements
 
 ## Installation
 
@@ -333,10 +333,19 @@ const [cards, setCards] = useState(initialCards);
 `onCardsChange` required. You can also just pass `cards` + `onCardsChange` to the
 regular `KanbanBoard`.
 
-> **⚠️ Migration (v2 → v3):** In v2, changing `initialCards` after mount reset the
-> board. As of v3, `initialCards` is **uncontrolled** and seeds state only once —
-> later changes are ignored. If you were updating `initialCards` from a backend,
-> switch to controlled mode (`cards` + `onCardsChange`).
+> **⚠️ Migration (v2 → v3):**
+>
+> - **State:** In v2, changing `initialCards` after mount reset the board. As of
+>   v3, `initialCards` is **uncontrolled** and seeds state only once — later
+>   changes are ignored. If you were updating `initialCards` from a backend,
+>   switch to controlled mode (`cards` + `onCardsChange`).
+> - **Drag-and-drop:** v3 replaces native HTML5 drag-and-drop with
+>   [dnd-kit](https://dndkit.com/) for touch and keyboard support. The board now
+>   requires `@dnd-kit/core`, `@dnd-kit/sortable`, and `@dnd-kit/utilities`
+>   (installed automatically as dependencies).
+> - **`renderCard`:** the second argument changed from `handleDragStart` to
+>   `isDragging: boolean`. Custom cards no longer need to wire drag events — the
+>   whole card is a drag handle. Remove any `draggable`/`onDragStart` you added.
 
 ## Props
 
@@ -358,7 +367,7 @@ regular `KanbanBoard`.
 | `onCardEdit`          | `(cardId: string, newTitle: string) => void`                                                                                                                      | -                | Callback function when a card is edited.                                                                              |
 | `onCardDelete`        | `(cardId: string) => void`                                                                                                                                        | -                | Callback function when a card is deleted.                                                                             |
 | `onTaskAddedCallback` | `(title: string) => void`                                                                                                                                         | -                | Callback function when a new task is added.                                                                           |
-| `renderCard`          | `(card: Card, handleDragStart: (e: React.DragEvent<HTMLDivElement>, card: Card) => void, isExpanded?: boolean, toggleExpand?: (id: string) => void) => ReactNode` | -                | Custom function to render cards.                                                                                      |
+| `renderCard`          | `(card: Card, isDragging?: boolean, isExpanded?: boolean, toggleExpand?: (id: string) => void) => ReactNode`                                                       | -                | Custom function to render cards. The card is wrapped in a drag handle automatically — you no longer wire up drag events yourself. `isDragging` is `true` for the card being dragged. |
 | `renderAvatar`        | `(avatarPath?: string) => ReactNode`                                                                                                                              | -                | Custom function to render avatars.                                                                                    |
 | `renderAddCard`       | `(column: string, setCards: React.Dispatch<React.SetStateAction<Card[]>>) => ReactNode`                                                                           | -                | Custom function to render the add card button.                                                                        |
 | `isLoading`           | `boolean`                                                                                                                                                         | `false`          | Shows loading spinner when true.                                                                                      |

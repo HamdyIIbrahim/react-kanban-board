@@ -1,14 +1,13 @@
 import { Page } from "@playwright/test";
 
 /**
- * Dispatch a real HTML5 drag sequence with a shared DataTransfer at a
- * controlled clientY so the component's getNearestIndicator picks a
- * deterministic slot. Drops the card identified by `cardId` into `columnKey`,
- * immediately before the card whose id is `beforeId` ("-1" = end of column).
+ * Drag a card with a real pointer (mouse) sequence that activates dnd-kit's
+ * PointerSensor. Drops the card `cardId` into `columnKey`, immediately before
+ * the card `beforeId` ("-1" = end of the column).
  *
- * Native drag-and-drop can't be reliably simulated with synthetic mouse events
- * in headless Chromium, so we drive the drag events directly. This exercises the
- * component's real handleDragStart / handleDragEnd / getNearestIndicator code.
+ * Drives the actual component: dnd-kit sensors + our board-level onDragEnd /
+ * computeReorder path. Pointer dragging works with the same code that powers
+ * touch and keyboard, so this exercises the real drag engine.
  */
 export async function drag(
   page: Page,
@@ -16,48 +15,122 @@ export async function drag(
   columnKey: string,
   beforeId: string
 ): Promise<void> {
-  await page.evaluate(
-    ({ cardId, columnKey, beforeId }) => {
-      const source = document.querySelector(`[data-card-id="${cardId}"] .card`);
-      const column = document.querySelector(
-        `[data-testid="column-${columnKey}"]`
-      );
-      if (!source || !column) throw new Error("drag: source/column not found");
+  const src = await page.locator(`[data-card-id="${cardId}"]`).boundingBox();
+  if (!src) throw new Error(`drag: source card ${cardId} not found`);
 
-      let clientX: number;
-      let clientY: number;
-      if (beforeId === "-1") {
-        const cr = column.getBoundingClientRect();
-        clientX = cr.left + cr.width / 2;
-        clientY = cr.bottom + 200; // below everything -> move to back
-      } else {
-        const ind = document.querySelector(
-          `[data-column="${columnKey}"][data-before="${beforeId}"]`
-        );
-        if (!ind) throw new Error(`drag: indicator not found for ${beforeId}`);
-        const ir = ind.getBoundingClientRect();
-        clientX = ir.left + ir.width / 2;
-        clientY = ir.top + 49; // selects this indicator (DISTANCE_OFFSET = 50)
-      }
+  const { x: targetX, y: targetY } = await dropPoint(page, columnKey, beforeId);
+  const startX = src.x + src.width / 2;
+  const startY = src.y + src.height / 2;
 
-      const dt = new DataTransfer();
-      const fire = (type: string, el: Element, extra: object = {}) =>
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  // Small nudge to cross the sensor activation distance, then move to target.
+  await page.mouse.move(startX, startY - 6, { steps: 3 });
+  await page.mouse.move(targetX, targetY, { steps: 15 });
+  await page.mouse.move(targetX, targetY, { steps: 3 });
+  await page.mouse.up();
+}
+
+// Screen point to drop over: the upper area of `beforeId`, or just below the
+// last card ("-1" = end of column).
+async function dropPoint(
+  page: Page,
+  columnKey: string,
+  beforeId: string
+): Promise<{ x: number; y: number }> {
+  if (beforeId === "-1") {
+    const cards = page.locator(
+      `[data-testid="column-${columnKey}"] [data-card-id]`
+    );
+    const count = await cards.count();
+    if (count > 0) {
+      const last = (await cards.nth(count - 1).boundingBox())!;
+      return { x: last.x + last.width / 2, y: last.y + last.height + 20 };
+    }
+    const col = (await page
+      .locator(`[data-testid="column-${columnKey}"] .column-content`)
+      .boundingBox())!;
+    return { x: col.x + col.width / 2, y: col.y + col.height / 2 };
+  }
+  const before = (await page
+    .locator(`[data-card-id="${beforeId}"]`)
+    .boundingBox())!;
+  return { x: before.x + before.width / 2, y: before.y + 10 };
+}
+
+/**
+ * Keyboard-driven drag: focus the card, Space to pick up, arrow keys to move,
+ * Space to drop (or Escape to cancel). Exercises dnd-kit's KeyboardSensor —
+ * the accessibility path.
+ */
+export async function keyboardDrag(
+  page: Page,
+  cardId: string,
+  moves: Array<"Up" | "Down" | "Left" | "Right">,
+  finish: "drop" | "cancel" = "drop"
+): Promise<void> {
+  await page.locator(`[data-card-id="${cardId}"]`).focus();
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(120);
+  for (const m of moves) {
+    await page.keyboard.press(`Arrow${m}`);
+    await page.waitForTimeout(120);
+  }
+  await page.keyboard.press(finish === "drop" ? "Space" : "Escape");
+  await page.waitForTimeout(200);
+}
+
+/**
+ * Touch-driven drag using synthetic touch events with the press-and-hold delay
+ * that dnd-kit's TouchSensor requires. Requires a touch-enabled context
+ * (test.use({ hasTouch: true })).
+ */
+export async function touchDrag(
+  page: Page,
+  cardId: string,
+  columnKey: string,
+  beforeId: string
+): Promise<void> {
+  const src = (await page.locator(`[data-card-id="${cardId}"]`).boundingBox())!;
+  const target = await dropPoint(page, columnKey, beforeId);
+  const sx = src.x + src.width / 2;
+  const sy = src.y + src.height / 2;
+
+  const dispatch = (type: string, x: number, y: number) =>
+    page.evaluate(
+      ({ cardId, type, x, y }) => {
+        const el = document.querySelector(`[data-card-id="${cardId}"]`)!;
+        const t = new Touch({
+          identifier: 1,
+          target: el,
+          clientX: x,
+          clientY: y,
+          pageX: x,
+          pageY: y,
+        });
+        const touches = type === "touchend" ? [] : [t];
         el.dispatchEvent(
-          new DragEvent(type, {
+          new TouchEvent(type, {
             bubbles: true,
             cancelable: true,
-            dataTransfer: dt,
-            ...extra,
+            touches,
+            targetTouches: touches,
+            changedTouches: [t],
           })
         );
+      },
+      { cardId, type, x, y }
+    );
 
-      fire("dragstart", source);
-      fire("dragover", column, { clientX, clientY });
-      fire("drop", column, { clientX, clientY });
-      fire("dragend", source);
-    },
-    { cardId, columnKey, beforeId }
-  );
+  await dispatch("touchstart", sx, sy);
+  await page.waitForTimeout(280); // press-and-hold to activate
+  for (let i = 1; i <= 8; i++) {
+    await dispatch("touchmove", sx + (target.x - sx) * (i / 8), sy + (target.y - sy) * (i / 8));
+    await page.waitForTimeout(30);
+  }
+  await dispatch("touchmove", target.x, target.y);
+  await dispatch("touchend", target.x, target.y);
+  await page.waitForTimeout(300);
 }
 
 /** Ordered list of card ids currently rendered in a column. */

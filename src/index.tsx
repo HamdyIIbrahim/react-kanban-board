@@ -1,13 +1,126 @@
 import React, {
   useState,
-  DragEvent,
   ReactNode,
   useEffect,
   useRef,
   useCallback,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  useDroppable,
+  type DragStartEvent,
+  type DragEndEvent,
+  type Announcements,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import "./KanbanBoard.css";
+
+// Prefix used to identify a column's droppable area (vs. a card droppable).
+const COLUMN_DROP_PREFIX = "column:";
+
+// Pure reorder computation shared by pointer, touch and keyboard dragging.
+// Translates a dnd-kit (activeId, overId) into the next flat card list plus the
+// drop position within the destination column. `overId` may be a card id or a
+// `column:<key>` droppable id. Returns `wipBlockedColumn` instead of a result
+// when the move would exceed a destination column's WIP limit.
+function computeReorder(
+  cards: Card[],
+  columns: Column[],
+  activeId: string,
+  overId: string
+):
+  | { nextCards: Card[]; destColumn: string; position: DropPosition }
+  | { wipBlockedColumn: string }
+  | null {
+  const activeCard = cards.find((c) => c.id === activeId);
+  if (!activeCard) return null;
+
+  const destColumn = overId.startsWith(COLUMN_DROP_PREFIX)
+    ? overId.slice(COLUMN_DROP_PREFIX.length)
+    : cards.find((c) => c.id === overId)?.status;
+  if (destColumn === undefined) return null;
+
+  const sourceColumn = activeCard.status;
+  const isSameColumn = sourceColumn === destColumn;
+
+  // WIP limit check for cross-column moves.
+  if (!isSameColumn) {
+    const limit = columns.find((col) => col.key === destColumn)?.limit;
+    if (limit !== undefined) {
+      const count = cards.filter(
+        (c) => c.status === destColumn && c.id !== activeId
+      ).length;
+      if (count >= limit) return { wipBlockedColumn: destColumn };
+    }
+  }
+
+  // Determine the card the active card should be inserted before ("-1" = end),
+  // honoring drag direction within a column.
+  const destListNoActive = cards
+    .filter((c) => c.status === destColumn && c.id !== activeId)
+    .map((c) => c.id);
+
+  let beforeId: string;
+  if (overId.startsWith(COLUMN_DROP_PREFIX)) {
+    beforeId = "-1";
+  } else {
+    const fullDestList = cards
+      .filter((c) => c.status === destColumn)
+      .map((c) => c.id);
+    const activeIdx = fullDestList.indexOf(activeId);
+    const overIdx = fullDestList.indexOf(overId);
+    const overPos = destListNoActive.indexOf(overId);
+    const insertPos =
+      isSameColumn && activeIdx !== -1 && activeIdx < overIdx
+        ? overPos + 1
+        : overPos;
+    beforeId = destListNoActive[insertPos] ?? "-1";
+  }
+
+  // No-op: dropping right back where it already is.
+  const currentBefore =
+    cards.filter((c) => c.status === sourceColumn).map((c) => c.id)[
+      cards.filter((c) => c.status === sourceColumn).findIndex((c) => c.id === activeId) + 1
+    ] ?? "-1";
+  if (isSameColumn && beforeId === activeId) return null;
+  if (isSameColumn && beforeId === currentBefore) return null;
+
+  const rest = cards.filter((c) => c.id !== activeId);
+  const updated = isSameColumn
+    ? activeCard
+    : { ...activeCard, status: destColumn };
+  if (beforeId === "-1") {
+    rest.push(updated);
+  } else {
+    const idx = rest.findIndex((c) => c.id === beforeId);
+    if (idx === -1) rest.push(updated);
+    else rest.splice(idx, 0, updated);
+  }
+
+  const columnCards = rest.filter((c) => c.status === destColumn);
+  const indexInColumn = columnCards.findIndex((c) => c.id === activeId);
+  const position: DropPosition = {
+    prevTaskId: columnCards[indexInColumn - 1]?.id ?? null,
+    nextTaskId: columnCards[indexInColumn + 1]?.id ?? null,
+    index: indexInColumn,
+  };
+
+  return { nextCards: rest, destColumn, position };
+}
 
 export interface Card {
   id: string;
@@ -72,17 +185,24 @@ interface DefaultCardProps {
   dueDate?: string;
   tags?: string[];
   description?: string;
-  handleDragStart: (
-    e: any,
-    card: { title: string; id: string; status: string }
-  ) => void;
   renderAvatar?: (avatarPath?: string) => ReactNode;
   children?: ReactNode;
   isExpanded?: boolean;
   toggleExpand?: (id: string) => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
+  isDragging?: boolean; // true for the source card while it is being dragged
+  isOverlay?: boolean; // true when rendered inside the DragOverlay preview
 }
+
+// Signature for custom card renderers. `isDragging` is true for the card being
+// dragged (and for the drag overlay copy).
+export type RenderCard = (
+  card: Card,
+  isDragging?: boolean,
+  isExpanded?: boolean,
+  toggleExpand?: (id: string) => void
+) => ReactNode;
 
 export interface KanbanBoardProps {
   columns: Column[];
@@ -103,12 +223,7 @@ export interface KanbanBoardProps {
   onCardEdit?: (cardId: string, newTitle: string) => void;
   onCardDelete?: (cardId: string) => void;
   onTaskAddedCallback?: (title: string) => void;
-  renderCard?: (
-    card: Card,
-    handleDragStart: (e: DragEvent<HTMLDivElement>, card: Card) => void,
-    isExpanded?: boolean,
-    toggleExpand?: (id: string) => void
-  ) => ReactNode;
+  renderCard?: RenderCard;
   renderAvatar?: (avatarPath?: string) => ReactNode;
   renderAddCard?: (
     column: string,
@@ -146,20 +261,10 @@ interface ColumnProps {
   setCards: React.Dispatch<React.SetStateAction<Card[]>>;
   color: string;
   limit?: number;
-  onCardMove?: (
-    cardId: string,
-    newStatus: string,
-    position: DropPosition
-  ) => void;
   onCardEdit?: (cardId: string, newTitle: string) => void;
   onCardDelete?: (cardId: string) => void;
   onTaskAddedCallback?: (title: string) => void;
-  renderCard?: (
-    card: Card,
-    handleDragStart: (e: DragEvent<HTMLDivElement>, card: Card) => void,
-    isExpanded?: boolean,
-    toggleExpand?: (id: string) => void
-  ) => ReactNode;
+  renderCard?: RenderCard;
   renderAvatar?: (avatarPath?: string) => ReactNode;
   renderAddCard?: (
     column: string,
@@ -173,6 +278,7 @@ interface ColumnProps {
   emptyMessage?: string;
   renderColumnLoading?: (column: Column) => ReactNode;
   columnData: Column;
+  isWipBlocked: boolean;
 }
 
 interface AddCardProps {
@@ -373,6 +479,83 @@ const KanbanBoard = ({
 
   const boardRef = useRef<HTMLDivElement>(null);
 
+  // ---- Drag and drop (pointer, touch, keyboard via dnd-kit) ----
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [wipBlockedColumn, setWipBlockedColumn] = useState<string | null>(null);
+  const wipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sensors = useSensors(
+    // Mouse: small distance so clicks on card buttons don't start a drag.
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    // Touch: short press-and-hold to begin a drag (lets touch scrolling work).
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const activeCard = activeCardId
+    ? cardsRef.current.find((c) => c.id === activeCardId) ?? null
+    : null;
+
+  const flashWipBlocked = (columnKey: string) => {
+    setWipBlockedColumn(columnKey);
+    if (wipTimerRef.current) clearTimeout(wipTimerRef.current);
+    wipTimerRef.current = setTimeout(() => setWipBlockedColumn(null), 2000);
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveCardId(String(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveCardId(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const result = computeReorder(
+      cardsRef.current,
+      columns,
+      String(active.id),
+      String(over.id)
+    );
+    if (!result) return;
+    if ("wipBlockedColumn" in result) {
+      flashWipBlocked(result.wipBlockedColumn);
+      return;
+    }
+
+    setCards(result.nextCards);
+    onCardMove?.(String(active.id), result.destColumn, result.position);
+  };
+
+  const handleDragCancel = () => setActiveCardId(null);
+
+  useEffect(() => {
+    return () => {
+      if (wipTimerRef.current) clearTimeout(wipTimerRef.current);
+    };
+  }, []);
+
+  // Screen-reader announcements for keyboard / assistive-tech dragging.
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Picked up card ${active.id}.`,
+    onDragOver: ({ active, over }) =>
+      over
+        ? `Card ${active.id} is over ${String(over.id).replace(
+            COLUMN_DROP_PREFIX,
+            "column "
+          )}.`
+        : `Card ${active.id} is no longer over a drop target.`,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `Card ${active.id} was dropped.`
+        : `Card ${active.id} was dropped back to its position.`,
+    onDragCancel: ({ active }) => `Dragging card ${active.id} was cancelled.`,
+  };
+
   // Handle filter change
   const handleFilterChange = (field: string, value: string | null) => {
     const newFilters = {
@@ -514,37 +697,62 @@ const KanbanBoard = ({
         </div>
       )}
 
-      <div className="kanban-board">
-        {columns.map((column) => (
-          <ColumnComponent
-            key={column.key}
-            title={column.title}
-            column={column.key}
-            cards={cards}
-            filteredCards={filteredCards.filter(
-              (card) => card.status === column.key
-            )}
-            setCards={setCards}
-            color={column.color}
-            limit={column.limit}
-            onCardMove={onCardMove}
-            onCardEdit={onCardEdit}
-            onCardDelete={onCardDelete}
-            renderCard={renderCard}
-            renderAvatar={renderAvatar}
-            renderAddCard={renderAddCard}
-            onTaskAddedCallback={onTaskAddedCallback}
-            columnForAddCard={columnForAddCard}
-            emptyColumnMessage={emptyColumnMessage}
-            deleteConfirmation={deleteConfirmation}
-            undoDuration={undoDuration}
-            isColumnLoading={column.isLoading}
-            emptyMessage={column.emptyMessage}
-            renderColumnLoading={renderColumnLoading}
-            columnData={column}
-          />
-        ))}
-      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        accessibility={{ announcements }}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="kanban-board">
+          {columns.map((column) => (
+            <ColumnComponent
+              key={column.key}
+              title={column.title}
+              column={column.key}
+              cards={cards}
+              filteredCards={filteredCards.filter(
+                (card) => card.status === column.key
+              )}
+              setCards={setCards}
+              color={column.color}
+              limit={column.limit}
+              onCardEdit={onCardEdit}
+              onCardDelete={onCardDelete}
+              renderCard={renderCard}
+              renderAvatar={renderAvatar}
+              renderAddCard={renderAddCard}
+              onTaskAddedCallback={onTaskAddedCallback}
+              columnForAddCard={columnForAddCard}
+              emptyColumnMessage={emptyColumnMessage}
+              deleteConfirmation={deleteConfirmation}
+              undoDuration={undoDuration}
+              isColumnLoading={column.isLoading}
+              emptyMessage={column.emptyMessage}
+              renderColumnLoading={renderColumnLoading}
+              columnData={column}
+              isWipBlocked={wipBlockedColumn === column.key}
+            />
+          ))}
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {activeCard ? (
+            <div className="card-drag-overlay">
+              {renderCard ? (
+                renderCard(activeCard, undefined, undefined, undefined)
+              ) : (
+                <DefaultCard
+                  {...activeCard}
+                  renderAvatar={renderAvatar}
+                  isExpanded={false}
+                  isOverlay
+                />
+              )}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 };
@@ -574,7 +782,6 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   columnForAddCard,
   color,
   limit,
-  onCardMove,
   onCardEdit,
   onCardDelete,
   renderCard,
@@ -588,8 +795,12 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   emptyMessage,
   renderColumnLoading,
   columnData,
+  isWipBlocked,
 }) => {
-  const [active, setActive] = useState(false);
+  // Column-level droppable so empty columns and gaps still accept drops.
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `${COLUMN_DROP_PREFIX}${column}`,
+  });
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState<string>("");
   const [expandedCards, setExpandedCards] = useState<{
@@ -606,196 +817,14 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   } | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const columnRef = useRef<HTMLDivElement>(null);
   const isLimitExceeded = limit !== undefined && filteredCards.length > limit;
 
   const columnStyle = {
     backgroundColor: color,
   };
 
-  const handleDragStart = (e: DragEvent<HTMLDivElement>, card: Card) => {
-    e.dataTransfer.setData("cardId", card.id);
-
-    // Create and set custom drag image
-    const dragPreview = document.createElement("div");
-    dragPreview.className = "card-drag-preview";
-    dragPreview.textContent =
-      card.title.length > 25 ? card.title.substring(0, 25) + "..." : card.title;
-    document.body.appendChild(dragPreview);
-    e.dataTransfer.setDragImage(dragPreview, 20, 20);
-
-    // Remove after drag ends
-    setTimeout(() => {
-      if (document.body.contains(dragPreview)) {
-        document.body.removeChild(dragPreview);
-      }
-    }, 0);
-  };
-
   const toggleExpand = (id: string) => {
     setExpandedCards((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const handleDragEnd = (e: DragEvent<HTMLDivElement>) => {
-    const cardId = e.dataTransfer.getData("cardId");
-
-    setActive(false);
-    clearHighlights();
-
-    // Get all drop indicators in the current column
-    const indicators = getIndicators();
-
-    // Find the nearest indicator based on mouse position
-    const { element } = getNearestIndicator(e, indicators);
-
-    // Get the ID of the card before which to insert the dragged card
-    const before = element.dataset.before || "-1";
-
-    // Only proceed if we're not trying to place the card in its original position
-    if (before !== cardId) {
-      let copy = [...cards];
-
-      // Find the card being dragged
-      const cardToMove = copy.find((c) => c.id === cardId);
-      if (!cardToMove) return;
-
-      // Get the current status of the card
-      const currentStatus = cardToMove.status;
-      const isSameColumn = currentStatus === column;
-
-      // If moving to a different column, check column limits
-      if (!isSameColumn && limit !== undefined) {
-        const columnCardCount = copy.filter(
-          (c) => c.status === column && c.id !== cardId
-        ).length;
-
-        // If moving to this column would exceed the limit
-        if (columnCardCount >= limit) {
-          showWipLimitNotification(columnRef.current);
-          return;
-        }
-      }
-
-      // Remove the card from its original position
-      copy = copy.filter((c) => c.id !== cardId);
-
-      // Create updated card with new status if column changed
-      const updatedCard = isSameColumn
-        ? cardToMove
-        : { ...cardToMove, status: column };
-
-      // Determine if we're adding the card to the end of the column
-      const moveToBack = before === "-1";
-
-      if (moveToBack) {
-        // Add the card to the end of the array
-        copy.push(updatedCard);
-      } else {
-        // Find the index where to insert the card
-        const insertAtIndex = copy.findIndex((el) => el.id === before);
-        if (insertAtIndex === -1) return; // Invalid index
-
-        // Insert the card at the proper position
-        copy.splice(insertAtIndex, 0, updatedCard);
-      }
-
-      // Update state
-      setCards(copy);
-
-      // Compute the final drop position within the destination column so
-      // consumers can persist ordering (e.g. prev/next task ids) on a backend.
-      const columnCards = copy.filter((c) => c.status === column);
-      const indexInColumn = columnCards.findIndex((c) => c.id === cardId);
-      const position: DropPosition = {
-        prevTaskId: columnCards[indexInColumn - 1]?.id ?? null,
-        nextTaskId: columnCards[indexInColumn + 1]?.id ?? null,
-        index: indexInColumn,
-      };
-
-      // Fire the callback for both cross-column moves and same-column reorders.
-      onCardMove?.(cardId, column, position);
-    }
-  };
-
-  const showWipLimitNotification = (columnEl: HTMLDivElement | null) => {
-    if (!columnEl) return;
-
-    const notification = document.createElement("div");
-    notification.className = "wip-limit-notification";
-    notification.textContent = `WIP limit (${limit}) reached!`;
-
-    columnEl.appendChild(notification);
-
-    setTimeout(() => {
-      notification.classList.add("show");
-
-      setTimeout(() => {
-        notification.classList.remove("show");
-        setTimeout(() => {
-          if (columnEl.contains(notification)) {
-            columnEl.removeChild(notification);
-          }
-        }, 300);
-      }, 2000);
-    }, 10);
-  };
-
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    highlightIndicator(e);
-    setActive(true);
-  };
-
-  const clearHighlights = (els?: HTMLElement[]) => {
-    const indicators = els || getIndicators();
-    indicators.forEach((i: any) => {
-      i.style.opacity = "0";
-    });
-  };
-
-  const highlightIndicator = (e: DragEvent<HTMLDivElement>) => {
-    const indicators = getIndicators();
-    clearHighlights(indicators);
-    const el = getNearestIndicator(e, indicators);
-    el.element.style.opacity = "1";
-  };
-
-  // Improved getNearestIndicator for better accuracy in finding drop targets
-  const getNearestIndicator = (
-    e: DragEvent<HTMLDivElement>,
-    indicators: HTMLElement[]
-  ) => {
-    const DISTANCE_OFFSET = 50;
-
-    // Calculate the position of each indicator relative to mouse
-    const el = indicators.reduce(
-      (closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = e.clientY - (box.top + DISTANCE_OFFSET);
-
-        // If this indicator is closer to the mouse than our current closest
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        } else {
-          return closest;
-        }
-      },
-      {
-        offset: Number.NEGATIVE_INFINITY,
-        element: indicators[indicators.length - 1],
-      }
-    );
-
-    return el;
-  };
-
-  const handleDragLeave = () => {
-    clearHighlights();
-    setActive(false);
-  };
-
-  const getIndicators = (): HTMLElement[] => {
-    return Array.from(document.querySelectorAll(`[data-column="${column}"]`));
   };
 
   // Immediately remove a card and notify the consumer.
@@ -907,13 +936,9 @@ const ColumnComponent: React.FC<ColumnProps> = ({
 
   return (
     <div
-      className={`kanban-column ${active ? "active" : ""} ${
+      className={`kanban-column ${isOver ? "active" : ""} ${
         isLimitExceeded ? "limit-exceeded" : ""
       }`}
-      onDrop={handleDragEnd}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      ref={columnRef}
       data-testid={`column-${column}`}
     >
       <div className="column-title" style={columnStyle}>
@@ -925,7 +950,10 @@ const ColumnComponent: React.FC<ColumnProps> = ({
           </span>
         </div>
       </div>
-      <div className={`column-content ${active ? "active" : ""}`}>
+      <div
+        ref={setDroppableRef}
+        className={`column-content ${isOver ? "active" : ""}`}
+      >
         {isColumnLoading ? (
           <div data-testid={`column-loading-${column}`}>
             {renderColumnLoading ? (
@@ -939,50 +967,48 @@ const ColumnComponent: React.FC<ColumnProps> = ({
             {emptyMessage ?? emptyColumnMessage}
           </div>
         ) : (
-          <AnimatePresence>
+          <SortableContext
+            items={filteredCards.map((c) => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
             {filteredCards.map((card) => (
-              <div className="motion-container" key={card.id}>
-                <DropIndicator beforeId={card.id} column={column} />
-                <motion.div
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  data-card-id={card.id}
-                  className="motion-card-wrapper"
-                >
-                  {editingCardId === card.id ? (
-                    <div className="card-edit">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={newTitle}
-                        onChange={handleEditChange}
-                        onBlur={() => handleSaveEdit(card.id)}
-                        onKeyDown={(e) => handleKeyDown(e, card.id)}
-                        aria-label="Edit card title"
-                      />
-                    </div>
-                  ) : renderCard ? (
-                    renderCard(
-                      card,
-                      handleDragStart,
-                      expandedCards[card.id],
-                      toggleExpand
-                    )
-                  ) : (
-                    <DefaultCard
-                      {...card}
-                      handleDragStart={handleDragStart}
-                      renderAvatar={renderAvatar}
-                      isExpanded={expandedCards[card.id]}
-                      toggleExpand={() => toggleExpand(card.id)}
-                      onDelete={() => handleDeleteCard(card.id)}
-                      onEdit={() => handleEditClick(card.id, card.title)}
+              <div className="card-slot" key={card.id}>
+                {editingCardId === card.id ? (
+                  <div className="card-edit" data-card-id={card.id}>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newTitle}
+                      onChange={handleEditChange}
+                      onBlur={() => handleSaveEdit(card.id)}
+                      onKeyDown={(e) => handleKeyDown(e, card.id)}
+                      aria-label="Edit card title"
                     />
-                  )}
-                </motion.div>
+                  </div>
+                ) : (
+                  <SortableCard id={card.id} title={card.title}>
+                    {(isDragging) =>
+                      renderCard ? (
+                        renderCard(
+                          card,
+                          isDragging,
+                          expandedCards[card.id],
+                          toggleExpand
+                        )
+                      ) : (
+                        <DefaultCard
+                          {...card}
+                          renderAvatar={renderAvatar}
+                          isExpanded={expandedCards[card.id]}
+                          isDragging={isDragging}
+                          toggleExpand={() => toggleExpand(card.id)}
+                          onDelete={() => handleDeleteCard(card.id)}
+                          onEdit={() => handleEditClick(card.id, card.title)}
+                        />
+                      )
+                    }
+                  </SortableCard>
+                )}
                 {confirmingDeleteId === card.id && (
                   <div
                     className="delete-confirm"
@@ -1013,7 +1039,16 @@ const ColumnComponent: React.FC<ColumnProps> = ({
                 )}
               </div>
             ))}
-          </AnimatePresence>
+          </SortableContext>
+        )}
+        {isWipBlocked && (
+          <div
+            className="wip-limit-notification show"
+            role="status"
+            data-testid={`wip-blocked-${column}`}
+          >
+            WIP limit ({limit}) reached!
+          </div>
         )}
         {pendingDelete && (
           <div
@@ -1032,7 +1067,6 @@ const ColumnComponent: React.FC<ColumnProps> = ({
             </button>
           </div>
         )}
-        <DropIndicator beforeId={-1} column={column} />
         <div className="add-card-container">
           {columnForAddCard === column ? (
             renderAddCard ? (
@@ -1051,22 +1085,65 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   );
 };
 
+// Sortable wrapper: makes its child card draggable via pointer, touch and
+// keyboard (Space to pick up, arrows to move, Space/Enter to drop, Esc to
+// cancel). The whole card is the drag handle; small movements are ignored so
+// clicks on inner buttons still work.
+const SortableCard = ({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: (isDragging: boolean) => ReactNode;
+}) => {
+  const {
+    setNodeRef,
+    attributes,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-card-id={id}
+      className="sortable-card-wrapper"
+      {...attributes}
+      {...listeners}
+      aria-label={title}
+    >
+      {children(isDragging)}
+    </div>
+  );
+};
+
 // Enhanced default card with better styling and icon positioning
 const DefaultCard = ({
   title,
   avatarPath,
   id,
-  status,
   priority,
   dueDate,
   tags,
   description,
-  handleDragStart,
   renderAvatar,
   isExpanded,
   toggleExpand,
   onDelete,
   onEdit,
+  isDragging,
+  isOverlay,
 }: DefaultCardProps) => {
   const hasDetails =
     priority || dueDate || description || (tags && tags.length > 0);
@@ -1082,32 +1159,15 @@ const DefaultCard = ({
   const borderColor = priority ? priorityColors[priority] : undefined;
 
   return (
-    <motion.div
-      layout
-      layoutId={id}
-      className={`card ${isExpanded ? "expanded" : ""}`}
-      draggable
-      onDragStart={(e) => handleDragStart(e, { title, id, status })}
+    <div
+      className={`card ${isExpanded ? "expanded" : ""} ${
+        isDragging ? "dragging" : ""
+      } ${isOverlay ? "overlay" : ""}`}
       style={{
         borderLeft: borderColor ? `4px solid ${borderColor}` : undefined,
       }}
-      whileHover={{
-        y: -2,
-        boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08)",
-      }}
-      transition={{
-        type: "spring",
-        stiffness: 400,
-        damping: 17,
-      }}
-      tabIndex={0}
       role="article"
       aria-label={`Card: ${title}`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          if (toggleExpand) toggleExpand(id);
-        }
-      }}
     >
       <div className="card-header">
         <h3 className="card-title">
@@ -1197,7 +1257,7 @@ const DefaultCard = ({
           </button>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -1288,23 +1348,6 @@ const DefaultAddCard = ({
     >
       <span>+</span> Add Card
     </motion.div>
-  );
-};
-
-const DropIndicator = ({
-  beforeId,
-  column,
-}: {
-  beforeId: string | number;
-  column: string;
-}) => {
-  return (
-    <div
-      data-before={beforeId}
-      data-column={column}
-      className="drop-indicator"
-      aria-hidden="true"
-    />
   );
 };
 

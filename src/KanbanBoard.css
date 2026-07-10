@@ -1002,6 +1002,36 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
 }
 
+/* dnd-kit sortable card wrapper (drag handle = whole card) */
+.sortable-card-wrapper {
+  outline: none;
+  touch-action: manipulation;
+  cursor: grab;
+}
+
+.sortable-card-wrapper:focus-visible .card {
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+.card.dragging {
+  cursor: grabbing;
+}
+
+/* Drag overlay preview follows the pointer/keyboard focus */
+.card-drag-overlay {
+  cursor: grabbing;
+}
+
+.card-drag-overlay .card,
+.card.overlay {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  transform: rotate(2deg);
+}
+
+.card-slot {
+  position: relative;
+}
+
 /* Per-column loading skeleton */
 .column-loading {
   display: flex;

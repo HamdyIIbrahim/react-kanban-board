@@ -16,9 +16,11 @@ const boardMode = params.get("mode") || "uncontrolled";
 const loadingCols = (params.get("loadingCols") || "").split(",").filter(Boolean);
 const emptyCols = (params.get("emptyCols") || "").split(",").filter(Boolean);
 
+const wipLimit = params.get("wip") ? Number(params.get("wip")) : 3;
+
 const columns: Column[] = [
   { title: "To Do", key: "todo", color: "#B8C2CC" },
-  { title: "In Progress", key: "in-progress", color: "#FFB1C1", limit: 3 },
+  { title: "In Progress", key: "in-progress", color: "#FFB1C1", limit: wipLimit },
   { title: "Review", key: "review", color: "#FFD580" },
   {
     title: "Done",

@@ -18,7 +18,7 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | `onCardEdit` | `(cardId: string, newTitle: string) => void` | No |  |
 | `onCardDelete` | `(cardId: string) => void` | No |  |
 | `onTaskAddedCallback` | `(title: string) => void` | No |  |
-| `renderCard` | `( card: Card, handleDragStart: (e: DragEvent<HTMLDivElement>, card: Card) => void, isExpanded?: boolean, toggleExpand?: (id: string) => void ) => ReactNode` | No |  |
+| `renderCard` | `RenderCard` | No |  |
 | `renderAvatar` | `(avatarPath?: string) => ReactNode` | No |  |
 | `renderAddCard` | `( column: string, setCards: React.Dispatch<React.SetStateAction<Card[]>> ) => ReactNode` | No |  |
 | `isLoading` | `boolean` | No |  |
