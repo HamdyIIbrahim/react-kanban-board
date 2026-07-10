@@ -40,6 +40,13 @@ export interface FilterConfig {
   options: FilterOption[];
 }
 
+// How a card deletion is guarded before onCardDelete is fired.
+// - "immediate": fire onCardDelete right away (default, backwards compatible)
+// - "confirm":   show an inline confirmation prompt first
+// - "undo":      remove the card immediately but defer onCardDelete, showing a
+//                brief undo toast that can restore the card
+export type DeleteConfirmation = "immediate" | "confirm" | "undo";
+
 // Position information about where a card landed within its destination column,
 // exposed through onCardMove so consumers can persist ordering on a backend.
 export interface DropPosition {
@@ -100,6 +107,10 @@ interface KanbanBoardProps {
   isLoading?: boolean;
   loadingComponent?: ReactNode;
   emptyColumnMessage?: string;
+  // How to guard card deletion before onCardDelete fires. Defaults to "immediate".
+  deleteConfirmation?: DeleteConfirmation;
+  // How long the undo toast stays before the delete is committed (ms). Default 5000.
+  undoDuration?: number;
   enableSearch?: boolean;
   enableFiltering?: boolean;
   filterConfigs?: FilterConfig[]; // New prop for custom filters
@@ -144,6 +155,8 @@ interface ColumnProps {
   ) => ReactNode;
   emptyColumnMessage?: string;
   filteredCards: Card[];
+  deleteConfirmation: DeleteConfirmation;
+  undoDuration: number;
 }
 
 interface AddCardProps {
@@ -286,6 +299,8 @@ const KanbanBoard = ({
   isLoading = false,
   loadingComponent,
   emptyColumnMessage = "No cards yet",
+  deleteConfirmation = "immediate",
+  undoDuration = 5000,
   enableSearch = false,
   enableFiltering = false,
   filterConfigs = [],
@@ -467,6 +482,8 @@ const KanbanBoard = ({
             onTaskAddedCallback={onTaskAddedCallback}
             columnForAddCard={columnForAddCard}
             emptyColumnMessage={emptyColumnMessage}
+            deleteConfirmation={deleteConfirmation}
+            undoDuration={undoDuration}
           />
         ))}
       </div>
@@ -491,6 +508,8 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   renderAddCard,
   onTaskAddedCallback,
   emptyColumnMessage,
+  deleteConfirmation,
+  undoDuration,
 }) => {
   const [active, setActive] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
@@ -498,6 +517,16 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   const [expandedCards, setExpandedCards] = useState<{
     [key: string]: boolean;
   }>({});
+  // Id of the card awaiting an inline delete confirmation ("confirm" mode).
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
+    null
+  );
+  // Card removed from view but not yet committed ("undo" mode).
+  const [pendingDelete, setPendingDelete] = useState<{
+    card: Card;
+    index: number;
+  } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const columnRef = useRef<HTMLDivElement>(null);
   const isLimitExceeded = limit !== undefined && filteredCards.length > limit;
@@ -691,10 +720,83 @@ const ColumnComponent: React.FC<ColumnProps> = ({
     return Array.from(document.querySelectorAll(`[data-column="${column}"]`));
   };
 
-  const handleDeleteCard = (cardId: string) => {
+  // Immediately remove a card and notify the consumer.
+  const commitDelete = (cardId: string) => {
     if (onCardDelete) onCardDelete(cardId);
     setCards((prevCards) => prevCards.filter((card) => card.id !== cardId));
   };
+
+  // Flush an in-flight "undo" deletion (commit it now).
+  const flushPendingDelete = () => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setPendingDelete((pending) => {
+      if (pending && onCardDelete) onCardDelete(pending.card.id);
+      return null;
+    });
+  };
+
+  const handleDeleteCard = (cardId: string) => {
+    if (deleteConfirmation === "confirm") {
+      setConfirmingDeleteId(cardId);
+      return;
+    }
+
+    if (deleteConfirmation === "undo") {
+      // Commit any previous pending delete before starting a new one.
+      flushPendingDelete();
+
+      const index = cards.findIndex((card) => card.id === cardId);
+      const card = cards.find((card) => card.id === cardId);
+      if (!card || index === -1) return;
+
+      // Remove from view immediately, but defer onCardDelete.
+      setCards((prevCards) => prevCards.filter((c) => c.id !== cardId));
+      setPendingDelete({ card, index });
+
+      undoTimerRef.current = setTimeout(() => {
+        undoTimerRef.current = null;
+        if (onCardDelete) onCardDelete(card.id);
+        setPendingDelete(null);
+      }, undoDuration);
+      return;
+    }
+
+    // "immediate" (default) — backwards compatible behavior.
+    commitDelete(cardId);
+  };
+
+  // Restore the card removed in "undo" mode back to its original position.
+  const handleUndoDelete = () => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setPendingDelete((pending) => {
+      if (!pending) return null;
+      setCards((prevCards) => {
+        const copy = [...prevCards];
+        copy.splice(Math.min(pending.index, copy.length), 0, pending.card);
+        return copy;
+      });
+      return null;
+    });
+  };
+
+  // Confirm ("confirm" mode) — actually delete the card.
+  const handleConfirmDelete = (cardId: string) => {
+    setConfirmingDeleteId(null);
+    commitDelete(cardId);
+  };
+
+  // Clear any pending timer on unmount to avoid updates after unmount.
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    };
+  }, []);
 
   const handleEditClick = (cardId: string, currentTitle: string) => {
     setEditingCardId(cardId);
@@ -793,9 +895,54 @@ const ColumnComponent: React.FC<ColumnProps> = ({
                     />
                   )}
                 </motion.div>
+                {confirmingDeleteId === card.id && (
+                  <div
+                    className="delete-confirm"
+                    role="alertdialog"
+                    aria-label="Confirm delete"
+                    data-testid={`delete-confirm-${card.id}`}
+                  >
+                    <span className="delete-confirm-text">
+                      Delete this card?
+                    </span>
+                    <div className="delete-confirm-actions">
+                      <button
+                        type="button"
+                        className="delete-confirm-cancel"
+                        onClick={() => setConfirmingDeleteId(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="delete-confirm-delete"
+                        onClick={() => handleConfirmDelete(card.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </AnimatePresence>
+        )}
+        {pendingDelete && (
+          <div
+            className="undo-toast"
+            role="status"
+            aria-live="polite"
+            data-testid={`undo-toast-${column}`}
+          >
+            <span className="undo-toast-text">Card deleted</span>
+            <button
+              type="button"
+              className="undo-toast-button"
+              onClick={handleUndoDelete}
+            >
+              Undo
+            </button>
+          </div>
         )}
         <DropIndicator beforeId={-1} column={column} />
         <div className="add-card-container">

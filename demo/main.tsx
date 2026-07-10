@@ -6,7 +6,11 @@ import KanbanBoard, {
   Card,
   FilterConfig,
   DropPosition,
+  DeleteConfirmation,
 } from "../src/index";
+
+const deleteMode = (new URLSearchParams(window.location.search).get("delete") ||
+  "immediate") as DeleteConfirmation;
 
 const columns: Column[] = [
   { title: "To Do", key: "todo", color: "#B8C2CC" },
@@ -110,6 +114,12 @@ const App = () => {
     setLastMove(JSON.stringify(payload, null, 0));
   };
 
+  const handleCardDelete = (cardId: string) => {
+    // eslint-disable-next-line no-console
+    console.log("onCardDelete:", cardId);
+    setLastMove(JSON.stringify({ deleted: cardId }));
+  };
+
   return (
     <div>
       <header className="app-header">
@@ -138,6 +148,9 @@ const App = () => {
           enableFiltering={true}
           filterConfigs={filterConfigs}
           onCardMove={handleCardMove}
+          onCardDelete={handleCardDelete}
+          deleteConfirmation={deleteMode}
+          undoDuration={3000}
         />
       </main>
     </div>
