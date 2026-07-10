@@ -8,8 +8,22 @@ import KanbanBoard, {
   DropPosition,
   DeleteConfirmation,
   ControlledKanbanBoard,
+  exportCardsToJSON,
+  exportCardsToCSV,
+  importCardsFromJSON,
+  importCardsFromCSV,
 } from "../src/index";
 import "./showcase.css";
+
+const download = (name: string, text: string, type: string) => {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 /* ---------------------------------------------------------------------------
    URL params still drive the initial state so the Playwright suite keeps
@@ -327,6 +341,7 @@ const App = () => {
   const [domCount, setDomCount] = useState(0);
   const [, setTick] = useState(0);
   const evtId = useRef(0);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const seed = useMemo(
     () =>
@@ -379,6 +394,26 @@ const App = () => {
     );
     push("change", { count: next.length });
     if (mode === "controlled") setCtrlCards(next);
+  };
+
+  const currentCards = mode.startsWith("controlled") ? ctrlCards : seed;
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      const imported = file.name.endsWith(".csv")
+        ? importCardsFromCSV(text)
+        : importCardsFromJSON(text);
+      setCtrlCards(imported);
+      setMode("controlled");
+      push("change", { count: imported.length });
+    } catch (err) {
+      // eslint-disable-next-line no-alert
+      window.alert("Import failed: " + (err as Error).message);
+    }
+    e.target.value = "";
   };
 
   // Live "cards in DOM" measurement (shows the virtualization win).
@@ -599,6 +634,45 @@ const App = () => {
             >
               force re-render
             </button>
+          </div>
+        </div>
+
+        <div className="ctl">
+          <span className="ctl-label">Data</span>
+          <div className="ctl-row">
+            <button
+              className="btn ghost tiny"
+              onClick={() =>
+                download(
+                  "board.json",
+                  exportCardsToJSON(currentCards),
+                  "application/json"
+                )
+              }
+            >
+              Export JSON
+            </button>
+            <button
+              className="btn ghost tiny"
+              onClick={() =>
+                download("board.csv", exportCardsToCSV(currentCards), "text/csv")
+              }
+            >
+              Export CSV
+            </button>
+            <button
+              className="btn ghost tiny"
+              onClick={() => fileRef.current?.click()}
+            >
+              Import
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json,.csv"
+              hidden
+              onChange={handleImport}
+            />
           </div>
         </div>
 

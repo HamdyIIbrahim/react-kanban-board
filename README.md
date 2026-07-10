@@ -300,6 +300,29 @@ const App = () => {
 export default App;
 ```
 
+## Export / import
+
+Pure helpers to snapshot or migrate a board's cards as JSON or CSV (no React
+dependency — usable on the server too):
+
+```jsx
+import {
+  exportCardsToJSON,
+  exportCardsToCSV,
+  importCardsFromJSON,
+  importCardsFromCSV,
+} from "react-custom-kanban-board";
+
+const json = exportCardsToJSON(cards); // pretty-printed JSON
+const csv = exportCardsToCSV(cards); // array fields (tags) joined with "|"
+
+const cards1 = importCardsFromJSON(json); // validates id/title/status
+const cards2 = importCardsFromCSV(csv); // parses quoted fields correctly
+```
+
+Invalid input throws a descriptive `Error`. CSV export includes the core card
+fields plus any extra scalar fields; CSV values import back as strings.
+
 ## Theming
 
 The board is styled entirely through `--kb-*` CSS variables (design tokens), so

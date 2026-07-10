@@ -34,6 +34,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import "./KanbanBoard.css";
 
+export {
+  exportCardsToJSON,
+  exportCardsToCSV,
+  importCardsFromJSON,
+  importCardsFromCSV,
+} from "./serialize";
+
 // Prefix used to identify a column's droppable area (vs. a card droppable).
 const COLUMN_DROP_PREFIX = "column:";
 // Prefix used for a column's sortable (drag-to-reorder) id.
