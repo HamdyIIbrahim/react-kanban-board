@@ -7,10 +7,12 @@ import KanbanBoard, {
   FilterConfig,
   DropPosition,
   DeleteConfirmation,
+  ControlledKanbanBoard,
 } from "../src/index";
 
 const params = new URLSearchParams(window.location.search);
 const deleteMode = (params.get("delete") || "immediate") as DeleteConfirmation;
+const boardMode = params.get("mode") || "uncontrolled";
 const loadingCols = (params.get("loadingCols") || "").split(",").filter(Boolean);
 const emptyCols = (params.get("emptyCols") || "").split(",").filter(Boolean);
 
@@ -108,10 +110,17 @@ const filterConfigs: FilterConfig[] = [
   },
 ];
 
+const seedCards = initialCards.filter((c) => !emptyCols.includes(c.status));
+
 const App = () => {
   const [lastMove, setLastMove] = useState<string>(
     "Drag a card to see the onCardMove payload here."
   );
+  // Forces parent re-renders (and thus a fresh initialCards array) to prove
+  // uncontrolled state is NOT reset by initialCards changing.
+  const [, setTick] = useState(0);
+  // Controlled-mode card state owned by the consumer.
+  const [ctrlCards, setCtrlCards] = useState<Card[]>(seedCards);
 
   const handleCardMove = (
     cardId: string,
@@ -130,10 +139,38 @@ const App = () => {
     setLastMove(JSON.stringify({ deleted: cardId }));
   };
 
+  const handleCardsChange = (next: Card[]) => {
+    // eslint-disable-next-line no-console
+    console.log("onCardsChange:", next.map((c) => `${c.id}:${c.status}`).join(","));
+    if (boardMode === "controlled") setCtrlCards(next);
+  };
+
+  const commonProps = {
+    columns,
+    columnForAddCard: "todo",
+    emptyColumnMessage: "No tasks yet",
+    enableSearch: true,
+    enableFiltering: true,
+    filterConfigs,
+    onCardMove: handleCardMove,
+    onCardDelete: handleCardDelete,
+    onCardsChange: handleCardsChange,
+    deleteConfirmation: deleteMode,
+    undoDuration: 3000,
+    renderColumnLoading: params.get("customLoading")
+      ? (col: Column) => (
+          <div data-testid={`custom-loading-${col.key}`}>Loading {col.title}…</div>
+        )
+      : undefined,
+  };
+
   return (
     <div>
       <header className="app-header">
-        <h1>Project Task Board</h1>
+        <h1>Project Task Board <small>({boardMode})</small></h1>
+        <button data-testid="bump" onClick={() => setTick((t) => t + 1)}>
+          Force re-render
+        </button>
         <pre
           style={{
             margin: "10px 0 0",
@@ -149,30 +186,19 @@ const App = () => {
         </pre>
       </header>
       <main className="board-container">
-        <KanbanBoard
-          columns={columns}
-          initialCards={initialCards.filter(
-            (c) => !emptyCols.includes(c.status)
-          )}
-          columnForAddCard="todo"
-          emptyColumnMessage="No tasks yet"
-          enableSearch={true}
-          enableFiltering={true}
-          filterConfigs={filterConfigs}
-          onCardMove={handleCardMove}
-          onCardDelete={handleCardDelete}
-          deleteConfirmation={deleteMode}
-          undoDuration={3000}
-          renderColumnLoading={
-            params.get("customLoading")
-              ? (col) => (
-                  <div data-testid={`custom-loading-${col.key}`}>
-                    Loading {col.title}…
-                  </div>
-                )
-              : undefined
-          }
-        />
+        {boardMode.startsWith("controlled") ? (
+          <ControlledKanbanBoard
+            {...commonProps}
+            cards={ctrlCards}
+            onCardsChange={handleCardsChange}
+          />
+        ) : (
+          <KanbanBoard
+            {...commonProps}
+            // New array reference each render on purpose (see bump button).
+            initialCards={seedCards.slice()}
+          />
+        )}
       </main>
     </div>
   );

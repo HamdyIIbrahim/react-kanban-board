@@ -4,6 +4,7 @@ import React, {
   ReactNode,
   useEffect,
   useRef,
+  useCallback,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import "./KanbanBoard.css";
@@ -83,9 +84,16 @@ interface DefaultCardProps {
   onEdit?: (id: string) => void;
 }
 
-interface KanbanBoardProps {
+export interface KanbanBoardProps {
   columns: Column[];
-  initialCards: Card[];
+  // Uncontrolled mode: the board owns card state, seeded once from initialCards.
+  initialCards?: Card[];
+  // Controlled mode: when provided, the board renders these cards directly and
+  // never mutates internal state. Pair with onCardsChange to receive updates.
+  cards?: Card[];
+  // Called with the full next card list on every internal mutation (move, edit,
+  // delete, add). Required for controlled mode; also fires in uncontrolled mode.
+  onCardsChange?: (cards: Card[]) => void;
   columnForAddCard: string;
   onCardMove?: (
     cardId: string,
@@ -305,7 +313,9 @@ const ColumnLoadingState = () => (
 const KanbanBoard = ({
   columns,
   columnForAddCard,
-  initialCards,
+  initialCards = [],
+  cards: controlledCards,
+  onCardsChange,
   onCardMove,
   onCardEdit,
   onCardDelete,
@@ -326,16 +336,42 @@ const KanbanBoard = ({
   renderSearchInput,
   renderFilterMenu,
 }: KanbanBoardProps) => {
-  const [cards, setCards] = useState<Card[]>(initialCards);
+  // Controlled vs. uncontrolled: if `cards` is provided the board renders it
+  // directly and never touches internal state; otherwise it owns the state,
+  // seeded once from `initialCards`.
+  const isControlled = controlledCards !== undefined;
+  const [internalCards, setInternalCards] = useState<Card[]>(initialCards);
+  const cards = isControlled ? (controlledCards as Card[]) : internalCards;
+
+  // Refs keep the stable setCards closure below reading the latest values.
+  const cardsRef = useRef<Card[]>(cards);
+  cardsRef.current = cards;
+  const isControlledRef = useRef(isControlled);
+  isControlledRef.current = isControlled;
+  const onCardsChangeRef = useRef(onCardsChange);
+  onCardsChangeRef.current = onCardsChange;
+
+  // Drop-in replacement for the old setCards, kept stable across renders.
+  // Accepts a value or updater, updates internal state (uncontrolled only) and
+  // always notifies via onCardsChange so controlled consumers can persist.
+  const setCards = useCallback<
+    React.Dispatch<React.SetStateAction<Card[]>>
+  >((update) => {
+    const base = cardsRef.current;
+    const next =
+      typeof update === "function"
+        ? (update as (prev: Card[]) => Card[])(base)
+        : update;
+    cardsRef.current = next;
+    if (!isControlledRef.current) setInternalCards(next);
+    onCardsChangeRef.current?.(next);
+  }, []);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<Record<string, string | null>>({});
-  const [filteredCards, setFilteredCards] = useState<Card[]>(initialCards);
+  const [filteredCards, setFilteredCards] = useState<Card[]>(cards);
 
   const boardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setCards(initialCards);
-  }, [initialCards]);
 
   // Handle filter change
   const handleFilterChange = (field: string, value: string | null) => {
@@ -511,6 +547,22 @@ const KanbanBoard = ({
       </div>
     </div>
   );
+};
+
+// Props for the explicit controlled variant: `cards` and `onCardsChange` are
+// required, and the uncontrolled-only `initialCards` is not accepted.
+export type ControlledKanbanBoardProps = Omit<
+  KanbanBoardProps,
+  "initialCards" | "cards" | "onCardsChange"
+> & {
+  cards: Card[];
+  onCardsChange: (cards: Card[]) => void;
+};
+
+// Explicit controlled board for consumers wiring state to a backend. This is a
+// thin wrapper over KanbanBoard that makes the controlled contract type-safe.
+export const ControlledKanbanBoard = (props: ControlledKanbanBoardProps) => {
+  return <KanbanBoard {...props} />;
 };
 
 const ColumnComponent: React.FC<ColumnProps> = ({

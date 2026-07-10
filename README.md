@@ -300,6 +300,44 @@ const App = () => {
 export default App;
 ```
 
+## Controlled vs. uncontrolled
+
+The board works in two modes:
+
+**Uncontrolled (default)** — pass `initialCards` and let the board own its state.
+It seeds once on mount; use the callbacks (`onCardMove`, `onCardEdit`,
+`onCardDelete`, `onCardsChange`) to observe changes.
+
+```jsx
+<KanbanBoard columns={columns} initialCards={initialCards} columnForAddCard="todo" />
+```
+
+**Controlled** — pass `cards` and `onCardsChange`. The board renders `cards`
+directly and never mutates internal state, so it stays perfectly in sync with a
+backend or external store. Every change hands you the full next list.
+
+```jsx
+import { ControlledKanbanBoard } from "react-custom-kanban-board";
+
+const [cards, setCards] = useState(initialCards);
+
+<ControlledKanbanBoard
+  columns={columns}
+  columnForAddCard="todo"
+  cards={cards}
+  onCardsChange={setCards} // persist to your backend here too
+/>;
+```
+
+`ControlledKanbanBoard` is a thin, type-safe wrapper that makes `cards` and
+`onCardsChange` required. You can also just pass `cards` + `onCardsChange` to the
+regular `KanbanBoard`.
+
+> **⚠️ Migration (v2 → v3):** In v2, changing `initialCards` after mount reset the
+> board. As of v3, `initialCards` is **uncontrolled** and seeds state only once —
+> later changes are ignored. If you were updating `initialCards` from a backend,
+> switch to controlled mode (`cards` + `onCardsChange`).
+
 ## Props
 
 > **📖 Authoritative API reference:** [`docs/API.md`](./docs/API.md) is generated
@@ -312,7 +350,9 @@ export default App;
 | Prop                  | Type                                                                                                                                                              | Default          | Description                                                                                                           |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `columns`             | `Column[]`                                                                                                                                                        | `[]`             | Array of columns to display. Each object should include `title`, `key`, and `color`.                                  |
-| `initialCards`        | `Card[]`                                                                                                                                                          | `[]`             | Array of cards to display initially. Each object should include `id`, `title`, `status`, and optionally `avatarPath`. |
+| `initialCards`        | `Card[]`                                                                                                                                                          | `[]`             | **Uncontrolled mode.** Seeds the board's internal card state once, on mount. Later changes to this prop are ignored (see [Controlled vs. uncontrolled](#controlled-vs-uncontrolled)). |
+| `cards`               | `Card[]`                                                                                                                                                          | -                | **Controlled mode.** When provided, the board renders these cards directly and never mutates internal state. Pair with `onCardsChange`. |
+| `onCardsChange`       | `(cards: Card[]) => void`                                                                                                                                         | -                | Called with the full next card list on every mutation (move, edit, delete, add). Required for controlled mode; also fires in uncontrolled mode. |
 | `columnForAddCard`    | `string`                                                                                                                                                          | -                | Key of the column where new cards will be added.                                                                      |
 | `onCardMove`          | `(cardId: string, newStatus: string, position: DropPosition) => void`                                                                                             | -                | Callback when a card is moved. Fires for both cross-column moves **and** same-column reordering. `position` exposes where the card landed within the destination column. |
 | `onCardEdit`          | `(cardId: string, newTitle: string) => void`                                                                                                                      | -                | Callback function when a card is edited.                                                                              |

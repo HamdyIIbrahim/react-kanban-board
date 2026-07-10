@@ -10,7 +10,9 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | Property | Type | Required | Description |
 | --- | --- | --- | --- |
 | `columns` | `Column[]` | Yes |  |
-| `initialCards` | `Card[]` | Yes |  |
+| `initialCards` | `Card[]` | No | Uncontrolled mode: the board owns card state, seeded once from initialCards. |
+| `cards` | `Card[]` | No | Controlled mode: when provided, the board renders these cards directly and never mutates internal state. Pair with onCardsChange to receive updates. |
+| `onCardsChange` | `(cards: Card[]) => void` | No | Called with the full next card list on every internal mutation (move, edit, delete, add). Required for controlled mode; also fires in uncontrolled mode. |
 | `columnForAddCard` | `string` | Yes |  |
 | `onCardMove` | `( cardId: string, newStatus: string, position: DropPosition ) => void` | No |  |
 | `onCardEdit` | `(cardId: string, newTitle: string) => void` | No |  |
