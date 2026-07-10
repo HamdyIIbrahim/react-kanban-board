@@ -11,6 +11,8 @@
     "clean": "rimraf dist",
     "build": "npm run clean && tsc && npm run build:css",
     "build:css": "postcss src/KanbanBoard.css -o dist/KanbanBoard.css",
+    "docs": "node scripts/generate-api-docs.cjs",
+    "docs:check": "node scripts/generate-api-docs.cjs --check",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build"
   },

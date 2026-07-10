@@ -302,6 +302,11 @@ export default App;
 
 ## Props
 
+> **📖 Authoritative API reference:** [`docs/API.md`](./docs/API.md) is generated
+> directly from the TypeScript source (`npm run docs`) and never drifts from the
+> actual types. The tables below are a hand-maintained summary; when in doubt,
+> trust the generated reference.
+
 ### KanbanBoard Component Props
 
 | Prop                  | Type                                                                                                                                                              | Default          | Description                                                                                                           |
