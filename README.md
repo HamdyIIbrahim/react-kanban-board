@@ -309,7 +309,7 @@ export default App;
 | `columns`             | `Column[]`                                                                                                                                                        | `[]`             | Array of columns to display. Each object should include `title`, `key`, and `color`.                                  |
 | `initialCards`        | `Card[]`                                                                                                                                                          | `[]`             | Array of cards to display initially. Each object should include `id`, `title`, `status`, and optionally `avatarPath`. |
 | `columnForAddCard`    | `string`                                                                                                                                                          | -                | Key of the column where new cards will be added.                                                                      |
-| `onCardMove`          | `(cardId: string, newStatus: string) => void`                                                                                                                     | -                | Callback function when a card is moved.                                                                               |
+| `onCardMove`          | `(cardId: string, newStatus: string, position: DropPosition) => void`                                                                                             | -                | Callback when a card is moved. Fires for both cross-column moves **and** same-column reordering. `position` exposes where the card landed within the destination column. |
 | `onCardEdit`          | `(cardId: string, newTitle: string) => void`                                                                                                                      | -                | Callback function when a card is edited.                                                                              |
 | `onCardDelete`        | `(cardId: string) => void`                                                                                                                                        | -                | Callback function when a card is deleted.                                                                             |
 | `onTaskAddedCallback` | `(title: string) => void`                                                                                                                                         | -                | Callback function when a new task is added.                                                                           |
@@ -349,6 +349,28 @@ export default App;
 | `description`   | `string`   | Detailed description of the card.               |
 | `assignee`      | `string`   | Person assigned to the card.                    |
 | `[key: string]` | `any`      | Any additional custom properties you need.      |
+
+### DropPosition Interface
+
+Passed as the third argument to `onCardMove`, describing where the card landed within its destination column. This makes it easy to persist ordering on a backend (e.g. by storing the previous/next task ids).
+
+| Property     | Type             | Description                                                                            |
+| ------------ | ---------------- | -------------------------------------------------------------------------------------- |
+| `prevTaskId` | `string \| null` | Id of the card immediately **before** the dropped card, or `null` if dropped at the top.    |
+| `nextTaskId` | `string \| null` | Id of the card immediately **after** the dropped card, or `null` if dropped at the bottom.  |
+| `index`      | `number`         | Zero-based index of the dropped card within the destination column.                    |
+
+```jsx
+<KanbanBoard
+  columns={columns}
+  initialCards={cards}
+  columnForAddCard="todo"
+  onCardMove={(cardId, newStatus, { prevTaskId, nextTaskId, index }) => {
+    // Persist the new ordering on your backend
+    api.reorderTask({ cardId, column: newStatus, prevTaskId, nextTaskId, index });
+  }}
+/>
+```
 
 ### FilterConfig Interface
 

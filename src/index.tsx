@@ -40,6 +40,19 @@ export interface FilterConfig {
   options: FilterOption[];
 }
 
+// Position information about where a card landed within its destination column,
+// exposed through onCardMove so consumers can persist ordering on a backend.
+export interface DropPosition {
+  // Id of the card immediately before the dropped card in the destination
+  // column, or null if it was dropped at the top.
+  prevTaskId: string | null;
+  // Id of the card immediately after the dropped card in the destination
+  // column, or null if it was dropped at the bottom.
+  nextTaskId: string | null;
+  // Zero-based index of the dropped card within the destination column.
+  index: number;
+}
+
 interface DefaultCardProps {
   title: string;
   avatarPath?: string;
@@ -65,7 +78,11 @@ interface KanbanBoardProps {
   columns: Column[];
   initialCards: Card[];
   columnForAddCard: string;
-  onCardMove?: (cardId: string, newStatus: string) => void;
+  onCardMove?: (
+    cardId: string,
+    newStatus: string,
+    position: DropPosition
+  ) => void;
   onCardEdit?: (cardId: string, newTitle: string) => void;
   onCardDelete?: (cardId: string) => void;
   onTaskAddedCallback?: (title: string) => void;
@@ -106,7 +123,11 @@ interface ColumnProps {
   setCards: React.Dispatch<React.SetStateAction<Card[]>>;
   color: string;
   limit?: number;
-  onCardMove?: (cardId: string, newStatus: string) => void;
+  onCardMove?: (
+    cardId: string,
+    newStatus: string,
+    position: DropPosition
+  ) => void;
   onCardEdit?: (cardId: string, newTitle: string) => void;
   onCardDelete?: (cardId: string) => void;
   onTaskAddedCallback?: (title: string) => void;
@@ -571,11 +592,21 @@ const ColumnComponent: React.FC<ColumnProps> = ({
         copy.splice(insertAtIndex, 0, updatedCard);
       }
 
-      // Update state and trigger callback if the column changed
+      // Update state
       setCards(copy);
-      if (!isSameColumn) {
-        onCardMove?.(cardId, column);
-      }
+
+      // Compute the final drop position within the destination column so
+      // consumers can persist ordering (e.g. prev/next task ids) on a backend.
+      const columnCards = copy.filter((c) => c.status === column);
+      const indexInColumn = columnCards.findIndex((c) => c.id === cardId);
+      const position: DropPosition = {
+        prevTaskId: columnCards[indexInColumn - 1]?.id ?? null,
+        nextTaskId: columnCards[indexInColumn + 1]?.id ?? null,
+        index: indexInColumn,
+      };
+
+      // Fire the callback for both cross-column moves and same-column reorders.
+      onCardMove?.(cardId, column, position);
     }
   };
 
