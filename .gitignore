@@ -1,6 +1,12 @@
 # Node modules
 /node_modules/
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/
+
 # Build output
 /dist/
 /build/

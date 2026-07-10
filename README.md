@@ -437,6 +437,20 @@ Passed as the third argument to `onCardMove`, describing where the card landed w
 | `value`  | `string` | Value of the filter option.          |
 | `label`  | `string` | Display label for the filter option. |
 
+## Development
+
+```bash
+npm install        # install deps
+npm run dev        # preview the component (demo/) at http://localhost:5173
+npm run build      # compile the library to dist/
+npm run docs       # regenerate docs/API.md from the TypeScript source
+npm test           # run the Playwright end-to-end suite (drives the demo)
+```
+
+The end-to-end tests in `test/` drive the demo app (which renders the library
+straight from `src/`), so they exercise real drag-and-drop, delete, loading, and
+controlled/uncontrolled behavior in a browser.
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request on GitHub.

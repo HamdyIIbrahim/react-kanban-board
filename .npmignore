@@ -1,7 +1,11 @@
 src/
 node_modules/
 tests/
+test/
 demo/
+scripts/
+docs/
 vite.config.ts
+playwright.config.ts
 tsconfig.json
 *.md

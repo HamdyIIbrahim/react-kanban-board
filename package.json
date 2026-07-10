@@ -13,6 +13,8 @@
     "build:css": "postcss src/KanbanBoard.css -o dist/KanbanBoard.css",
     "docs": "node scripts/generate-api-docs.cjs",
     "docs:check": "node scripts/generate-api-docs.cjs --check",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build"
   },
@@ -22,6 +24,7 @@
     "react-dom": "^16.* || ^17.* || ^18.* || ^19.*"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/react": "^16.* || ^17.* || ^18.* || ^19.*",
     "@types/react-dom": "^16.* || ^17.* || ^18.* || ^19.*",
     "@vitejs/plugin-react": "^6.0.3",
