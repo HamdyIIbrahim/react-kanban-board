@@ -150,6 +150,7 @@ export interface ConsoleCapture {
   moves: any[];
   deletes: string[];
   changes: string[];
+  columns: string[];
 }
 
 /**
@@ -157,7 +158,12 @@ export interface ConsoleCapture {
  * onCardDelete / onCardsChange as strings.
  */
 export function captureConsole(page: Page): ConsoleCapture {
-  const cap: ConsoleCapture = { moves: [], deletes: [], changes: [] };
+  const cap: ConsoleCapture = {
+    moves: [],
+    deletes: [],
+    changes: [],
+    columns: [],
+  };
   page.on("console", async (msg) => {
     const text = msg.text();
     if (text.startsWith("onCardMove:")) {
@@ -170,6 +176,8 @@ export function captureConsole(page: Page): ConsoleCapture {
       cap.deletes.push(text.replace("onCardDelete:", "").trim());
     } else if (text.startsWith("onCardsChange:")) {
       cap.changes.push(text.replace("onCardsChange:", "").trim());
+    } else if (text.startsWith("onColumnsReorder:")) {
+      cap.columns.push(text.replace("onColumnsReorder:", "").trim());
     }
   });
   return cap;

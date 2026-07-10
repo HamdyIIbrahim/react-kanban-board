@@ -263,6 +263,33 @@
   max-width: 75%;
 }
 
+/* Column drag-to-reorder grip */
+.sortable-column-wrapper {
+  display: flex;
+}
+.column-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.5;
+  cursor: grab;
+  padding: 2px;
+  margin-right: 6px;
+  border-radius: 6px;
+  touch-action: none;
+  transition: opacity 0.15s, background 0.15s;
+}
+.column-drag-handle:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}
+.column-drag-handle:active {
+  cursor: grabbing;
+}
+
 .column-counter-container {
   display: flex;
   align-items: center;

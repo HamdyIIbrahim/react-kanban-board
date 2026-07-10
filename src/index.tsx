@@ -15,7 +15,9 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  closestCenter,
   useDroppable,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
   type Announcements,
@@ -25,6 +27,8 @@ import {
   useSortable,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  horizontalListSortingStrategy,
+  arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -32,6 +36,21 @@ import "./KanbanBoard.css";
 
 // Prefix used to identify a column's droppable area (vs. a card droppable).
 const COLUMN_DROP_PREFIX = "column:";
+// Prefix used for a column's sortable (drag-to-reorder) id.
+const COLUMN_SORT_PREFIX = "col:";
+
+// When dragging a column, only column droppables should be considered so the
+// drop snaps to a sibling column (not a card inside one). Cards use the normal
+// closest-corners strategy.
+const boardCollisionDetection: CollisionDetection = (args) => {
+  if (String(args.active.id).startsWith(COLUMN_SORT_PREFIX)) {
+    const columnContainers = args.droppableContainers.filter((c) =>
+      String(c.id).startsWith(COLUMN_SORT_PREFIX)
+    );
+    return closestCenter({ ...args, droppableContainers: columnContainers });
+  }
+  return closestCorners(args);
+};
 
 // Pure reorder computation shared by pointer, touch and keyboard dragging.
 // Translates a dnd-kit (activeId, overId) into the next flat card list plus the
@@ -243,6 +262,11 @@ export interface KanbanBoardProps {
   deleteConfirmation?: DeleteConfirmation;
   // How long the undo toast stays before the delete is committed (ms). Default 5000.
   undoDuration?: number;
+  // Enable drag-to-reorder of columns (via a grip in each column header).
+  // Off by default.
+  enableColumnReorder?: boolean;
+  // Called with the new ordered column keys after a column is reordered.
+  onColumnsReorder?: (orderedKeys: string[]) => void;
   // Virtualize (window) a column's card list once it exceeds this many cards.
   // Off by default. Keeps very large columns (hundreds of cards) performant.
   virtualizeColumnsOver?: number;
@@ -291,6 +315,7 @@ interface ColumnProps {
   isWipBlocked: boolean;
   virtualizeColumnsOver?: number;
   virtualItemEstimatedHeight?: number;
+  columnDragHandle?: { attributes: any; listeners: any };
 }
 
 interface AddCardProps {
@@ -449,6 +474,8 @@ const KanbanBoard = ({
   renderColumnLoading,
   deleteConfirmation = "immediate",
   undoDuration = 5000,
+  enableColumnReorder = false,
+  onColumnsReorder,
   virtualizeColumnsOver,
   virtualItemEstimatedHeight = 120,
   enableSearch = false,
@@ -495,6 +522,28 @@ const KanbanBoard = ({
 
   const boardRef = useRef<HTMLDivElement>(null);
 
+  // ---- Column order (for optional drag-to-reorder) ----
+  const [columnOrder, setColumnOrder] = useState<string[]>(() =>
+    columns.map((c) => c.key)
+  );
+  // Reconcile when the set of column keys changes (kept order + new appended).
+  useEffect(() => {
+    setColumnOrder((prev) => {
+      const keys = columns.map((c) => c.key);
+      const kept = prev.filter((k) => keys.includes(k));
+      const added = keys.filter((k) => !kept.includes(k));
+      const next = [...kept, ...added];
+      return next.length === prev.length && next.every((k, i) => k === prev[i])
+        ? prev
+        : next;
+    });
+  }, [columns]);
+  const orderedColumns = enableColumnReorder
+    ? (columnOrder
+        .map((k) => columns.find((c) => c.key === k))
+        .filter(Boolean) as Column[])
+    : columns;
+
   // ---- Drag and drop (pointer, touch, keyboard via dnd-kit) ----
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [wipBlockedColumn, setWipBlockedColumn] = useState<string | null>(null);
@@ -523,6 +572,8 @@ const KanbanBoard = ({
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    // Column drags aren't tracked for the card overlay.
+    if (String(event.active.id).startsWith(COLUMN_SORT_PREFIX)) return;
     setActiveCardId(String(event.active.id));
   };
 
@@ -530,6 +581,20 @@ const KanbanBoard = ({
     setActiveCardId(null);
     const { active, over } = event;
     if (!over) return;
+
+    // Column reorder.
+    if (String(active.id).startsWith(COLUMN_SORT_PREFIX)) {
+      if (!String(over.id).startsWith(COLUMN_SORT_PREFIX)) return;
+      const from = String(active.id).slice(COLUMN_SORT_PREFIX.length);
+      const to = String(over.id).slice(COLUMN_SORT_PREFIX.length);
+      if (from === to) return;
+      setColumnOrder((prev) => {
+        const next = arrayMove(prev, prev.indexOf(from), prev.indexOf(to));
+        onColumnsReorder?.(next);
+        return next;
+      });
+      return;
+    }
 
     const result = computeReorder(
       cardsRef.current,
@@ -628,6 +693,39 @@ const KanbanBoard = ({
     );
   }
 
+  const renderColumn = (
+    column: Column,
+    columnDragHandle?: { attributes: any; listeners: any }
+  ) => (
+    <ColumnComponent
+      title={column.title}
+      column={column.key}
+      cards={cards}
+      filteredCards={filteredCards.filter((card) => card.status === column.key)}
+      setCards={setCards}
+      color={column.color}
+      limit={column.limit}
+      onCardEdit={onCardEdit}
+      onCardDelete={onCardDelete}
+      renderCard={renderCard}
+      renderAvatar={renderAvatar}
+      renderAddCard={renderAddCard}
+      onTaskAddedCallback={onTaskAddedCallback}
+      columnForAddCard={columnForAddCard}
+      emptyColumnMessage={emptyColumnMessage}
+      deleteConfirmation={deleteConfirmation}
+      undoDuration={undoDuration}
+      isColumnLoading={column.isLoading}
+      emptyMessage={column.emptyMessage}
+      renderColumnLoading={renderColumnLoading}
+      columnData={column}
+      isWipBlocked={wipBlockedColumn === column.key}
+      virtualizeColumnsOver={virtualizeColumnsOver}
+      virtualItemEstimatedHeight={virtualItemEstimatedHeight}
+      columnDragHandle={columnDragHandle}
+    />
+  );
+
   return (
     <div
       className={`kanban-board-container ${className || ""}`}
@@ -719,44 +817,34 @@ const KanbanBoard = ({
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={boardCollisionDetection}
         accessibility={{ announcements }}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
         <div className="kanban-board">
-          {columns.map((column) => (
-            <ColumnComponent
-              key={column.key}
-              title={column.title}
-              column={column.key}
-              cards={cards}
-              filteredCards={filteredCards.filter(
-                (card) => card.status === column.key
-              )}
-              setCards={setCards}
-              color={column.color}
-              limit={column.limit}
-              onCardEdit={onCardEdit}
-              onCardDelete={onCardDelete}
-              renderCard={renderCard}
-              renderAvatar={renderAvatar}
-              renderAddCard={renderAddCard}
-              onTaskAddedCallback={onTaskAddedCallback}
-              columnForAddCard={columnForAddCard}
-              emptyColumnMessage={emptyColumnMessage}
-              deleteConfirmation={deleteConfirmation}
-              undoDuration={undoDuration}
-              isColumnLoading={column.isLoading}
-              emptyMessage={column.emptyMessage}
-              renderColumnLoading={renderColumnLoading}
-              columnData={column}
-              isWipBlocked={wipBlockedColumn === column.key}
-              virtualizeColumnsOver={virtualizeColumnsOver}
-              virtualItemEstimatedHeight={virtualItemEstimatedHeight}
-            />
-          ))}
+          {enableColumnReorder ? (
+            <SortableContext
+              items={orderedColumns.map((c) => COLUMN_SORT_PREFIX + c.key)}
+              strategy={horizontalListSortingStrategy}
+            >
+              {orderedColumns.map((column) => (
+                <SortableColumn
+                  key={column.key}
+                  id={COLUMN_SORT_PREFIX + column.key}
+                >
+                  {(handle) => renderColumn(column, handle)}
+                </SortableColumn>
+              ))}
+            </SortableContext>
+          ) : (
+            orderedColumns.map((column) => (
+              <React.Fragment key={column.key}>
+                {renderColumn(column)}
+              </React.Fragment>
+            ))
+          )}
         </div>
         <DragOverlay dropAnimation={null}>
           {activeCard ? (
@@ -820,6 +908,7 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   isWipBlocked,
   virtualizeColumnsOver,
   virtualItemEstimatedHeight = 120,
+  columnDragHandle,
 }) => {
   // Column-level droppable so empty columns and gaps still accept drops.
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -1083,6 +1172,22 @@ const ColumnComponent: React.FC<ColumnProps> = ({
       data-testid={`column-${column}`}
     >
       <div className="column-title" style={columnStyle}>
+        {columnDragHandle && (
+          <button
+            type="button"
+            className="column-drag-handle"
+            aria-label={`Reorder column ${title}`}
+            data-testid={`column-grip-${column}`}
+            {...columnDragHandle.attributes}
+            {...columnDragHandle.listeners}
+          >
+            <svg viewBox="0 0 20 20" width="15" height="15" fill="currentColor" aria-hidden="true">
+              <circle cx="7" cy="5" r="1.5" /><circle cx="13" cy="5" r="1.5" />
+              <circle cx="7" cy="10" r="1.5" /><circle cx="13" cy="10" r="1.5" />
+              <circle cx="7" cy="15" r="1.5" /><circle cx="13" cy="15" r="1.5" />
+            </svg>
+          </button>
+        )}
         <div className="column-title-text">{title}</div>
         <div className="column-counter-container">
           <span className={`counter ${isLimitExceeded ? "exceeded" : ""}`}>
@@ -1206,6 +1311,39 @@ const VirtualCardSlots = ({
           );
         })}
       </div>
+    </div>
+  );
+};
+
+// Sortable wrapper for a whole column (drag-to-reorder). The column moves via
+// the wrapper's transform; the drag handle (grip) lives in the column header.
+const SortableColumn = ({
+  id,
+  children,
+}: {
+  id: string;
+  children: (handle: {
+    attributes: any;
+    listeners: any;
+  }) => ReactNode;
+}) => {
+  const {
+    setNodeRef,
+    transform,
+    transition,
+    attributes,
+    listeners,
+    isDragging,
+  } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : undefined,
+    height: "fit-content",
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="sortable-column-wrapper">
+      {children({ attributes, listeners })}
     </div>
   );
 };

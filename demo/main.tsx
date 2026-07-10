@@ -317,6 +317,9 @@ const App = () => {
     new Set(initialLoading)
   );
   const [bulkCount, setBulkCount] = useState(initialBulk);
+  const [columnReorder, setColumnReorder] = useState(
+    params.get("columnReorder") === "1"
+  );
   const [virtualizeOver, setVirtualizeOver] = useState<number | undefined>(
     initialVirtualize
   );
@@ -409,6 +412,12 @@ const App = () => {
     deleteConfirmation: deleteMode,
     undoDuration: 3000,
     className: theme === "dark" ? "kb-dark" : undefined,
+    enableColumnReorder: columnReorder,
+    onColumnsReorder: (keys: string[]) => {
+      // eslint-disable-next-line no-console
+      console.log("onColumnsReorder:", keys.join(","));
+      push("change", { count: keys.length, cols: keys.join(" · ") });
+    },
     virtualizeColumnsOver: virtualizeOver,
     renderCard:
       view === "crm" ? crmCard : view === "compact" ? compactCard : undefined,
@@ -575,6 +584,13 @@ const App = () => {
           <div className="ctl-row">
             <button className="btn ghost" onClick={simulateFetch}>
               Simulate fetch
+            </button>
+            <button
+              className="btn toggle"
+              data-on={columnReorder}
+              onClick={() => setColumnReorder((v) => !v)}
+            >
+              Reorder columns
             </button>
             <button
               className="btn ghost tiny"
