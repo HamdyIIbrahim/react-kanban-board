@@ -31,6 +31,9 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | `undoDuration` | `number` | No | How long the undo toast stays before the delete is committed (ms). Default 5000. |
 | `enableColumnReorder` | `boolean` | No | Enable drag-to-reorder of columns (via a grip in each column header). Off by default. |
 | `onColumnsReorder` | `(orderedKeys: string[]) => void` | No | Called with the new ordered column keys after a column is reordered. |
+| `enableMultiSelect` | `boolean` | No | Enable multi-select (Cmd/Ctrl-click to toggle, Shift-click for a range) with a bulk action bar. Off by default. |
+| `onBulkMove` | `(cardIds: string[], newStatus: string) => void` | No | Called when selected cards are moved to a column in bulk. |
+| `onBulkDelete` | `(cardIds: string[]) => void` | No | Called when selected cards are deleted in bulk. |
 | `virtualizeColumnsOver` | `number` | No | Virtualize (window) a column's card list once it exceeds this many cards. Off by default. Keeps very large columns (hundreds of cards) performant. |
 | `virtualItemEstimatedHeight` | `number` | No | Estimated card height in px, used by the virtualizer. Default 120. |
 | `enableSearch` | `boolean` | No |  |

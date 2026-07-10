@@ -279,6 +279,13 @@ export interface KanbanBoardProps {
   enableColumnReorder?: boolean;
   // Called with the new ordered column keys after a column is reordered.
   onColumnsReorder?: (orderedKeys: string[]) => void;
+  // Enable multi-select (Cmd/Ctrl-click to toggle, Shift-click for a range)
+  // with a bulk action bar. Off by default.
+  enableMultiSelect?: boolean;
+  // Called when selected cards are moved to a column in bulk.
+  onBulkMove?: (cardIds: string[], newStatus: string) => void;
+  // Called when selected cards are deleted in bulk.
+  onBulkDelete?: (cardIds: string[]) => void;
   // Virtualize (window) a column's card list once it exceeds this many cards.
   // Off by default. Keeps very large columns (hundreds of cards) performant.
   virtualizeColumnsOver?: number;
@@ -328,6 +335,13 @@ interface ColumnProps {
   virtualizeColumnsOver?: number;
   virtualItemEstimatedHeight?: number;
   columnDragHandle?: { attributes: any; listeners: any };
+  enableMultiSelect?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (
+    cardId: string,
+    e: React.MouseEvent,
+    columnCardIds: string[]
+  ) => void;
 }
 
 interface AddCardProps {
@@ -488,6 +502,9 @@ const KanbanBoard = ({
   undoDuration = 5000,
   enableColumnReorder = false,
   onColumnsReorder,
+  enableMultiSelect = false,
+  onBulkMove,
+  onBulkDelete,
   virtualizeColumnsOver,
   virtualItemEstimatedHeight = 120,
   enableSearch = false,
@@ -576,6 +593,58 @@ const KanbanBoard = ({
   const activeCard = activeCardId
     ? cardsRef.current.find((c) => c.id === activeCardId) ?? null
     : null;
+
+  // ---- Multi-select ----
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const lastSelectedRef = useRef<string | null>(null);
+
+  const handleToggleSelect = useCallback(
+    (cardId: string, e: React.MouseEvent, columnCardIds: string[]) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (e.shiftKey && lastSelectedRef.current) {
+          const a = columnCardIds.indexOf(lastSelectedRef.current);
+          const b = columnCardIds.indexOf(cardId);
+          if (a !== -1 && b !== -1) {
+            const [lo, hi] = a < b ? [a, b] : [b, a];
+            for (let i = lo; i <= hi; i++) next.add(columnCardIds[i]);
+            return next;
+          }
+        }
+        if (e.metaKey || e.ctrlKey) {
+          next.has(cardId) ? next.delete(cardId) : next.add(cardId);
+        } else {
+          next.clear();
+          next.add(cardId);
+        }
+        return next;
+      });
+      lastSelectedRef.current = cardId;
+    },
+    []
+  );
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const bulkMove = (newStatus: string) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setCards((prev) => {
+      const moved = prev.filter((c) => selectedIds.has(c.id));
+      const rest = prev.filter((c) => !selectedIds.has(c.id));
+      return [...rest, ...moved.map((c) => ({ ...c, status: newStatus }))];
+    });
+    onBulkMove?.(ids, newStatus);
+    clearSelection();
+  };
+
+  const bulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setCards((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+    onBulkDelete?.(ids);
+    clearSelection();
+  };
 
   const flashWipBlocked = (columnKey: string) => {
     setWipBlockedColumn(columnKey);
@@ -735,6 +804,9 @@ const KanbanBoard = ({
       virtualizeColumnsOver={virtualizeColumnsOver}
       virtualItemEstimatedHeight={virtualItemEstimatedHeight}
       columnDragHandle={columnDragHandle}
+      enableMultiSelect={enableMultiSelect}
+      selectedIds={selectedIds}
+      onToggleSelect={handleToggleSelect}
     />
   );
 
@@ -858,6 +930,46 @@ const KanbanBoard = ({
             ))
           )}
         </div>
+        {enableMultiSelect && selectedIds.size > 0 && (
+          <div
+            className="bulk-action-bar"
+            role="toolbar"
+            aria-label="Bulk actions"
+            data-testid="bulk-bar"
+          >
+            <span className="bulk-count" data-testid="bulk-count">
+              {selectedIds.size} selected
+            </span>
+            <span className="bulk-move-label">Move to</span>
+            {columns.map((col) => (
+              <button
+                key={col.key}
+                type="button"
+                className="bulk-btn"
+                data-testid={`bulk-move-${col.key}`}
+                onClick={() => bulkMove(col.key)}
+              >
+                {col.title}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="bulk-btn danger"
+              data-testid="bulk-delete"
+              onClick={bulkDelete}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className="bulk-btn ghost"
+              data-testid="bulk-clear"
+              onClick={clearSelection}
+            >
+              Clear
+            </button>
+          </div>
+        )}
         <DragOverlay dropAnimation={null}>
           {activeCard ? (
             <div className={`card-drag-overlay ${className || ""}`}>
@@ -921,6 +1033,9 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   virtualizeColumnsOver,
   virtualItemEstimatedHeight = 120,
   columnDragHandle,
+  enableMultiSelect,
+  selectedIds,
+  onToggleSelect,
 }) => {
   // Column-level droppable so empty columns and gaps still accept drops.
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -1084,6 +1199,17 @@ const ColumnComponent: React.FC<ColumnProps> = ({
           id={card.id}
           title={card.title}
           virtualized={shouldVirtualize}
+          selected={enableMultiSelect && selectedIds?.has(card.id)}
+          onSelect={
+            enableMultiSelect && onToggleSelect
+              ? (e) =>
+                  onToggleSelect(
+                    card.id,
+                    e,
+                    filteredCards.map((c) => c.id)
+                  )
+              : undefined
+          }
         >
           {(isDragging) =>
             renderCard ? (
@@ -1368,11 +1494,15 @@ const SortableCard = ({
   id,
   title,
   virtualized,
+  selected,
+  onSelect,
   children,
 }: {
   id: string;
   title: string;
   virtualized?: boolean;
+  selected?: boolean;
+  onSelect?: (e: React.MouseEvent) => void;
   children: (isDragging: boolean) => ReactNode;
 }) => {
   const {
@@ -1399,10 +1529,12 @@ const SortableCard = ({
       ref={setNodeRef}
       style={style}
       data-card-id={id}
-      className="sortable-card-wrapper"
+      className={`sortable-card-wrapper ${selected ? "selected" : ""}`}
       {...attributes}
       {...listeners}
       aria-label={title}
+      aria-selected={onSelect ? !!selected : undefined}
+      onClick={onSelect}
     >
       {children(isDragging)}
     </div>

@@ -339,6 +339,9 @@ const App = () => {
   const [persistMode, setPersistMode] = useState(
     params.get("persist") || "off"
   );
+  const [multiSelect, setMultiSelect] = useState(
+    params.get("multiSelect") === "1"
+  );
   const [virtualizeOver, setVirtualizeOver] = useState<number | undefined>(
     initialVirtualize
   );
@@ -466,6 +469,17 @@ const App = () => {
     deleteConfirmation: deleteMode,
     undoDuration: 3000,
     className: theme === "dark" ? "kb-dark" : undefined,
+    enableMultiSelect: multiSelect,
+    onBulkMove: (ids: string[], status: string) => {
+      // eslint-disable-next-line no-console
+      console.log("onBulkMove:", ids.join(",") + "->" + status);
+      push("change", { count: ids.length, cols: `bulk → ${status}` });
+    },
+    onBulkDelete: (ids: string[]) => {
+      // eslint-disable-next-line no-console
+      console.log("onBulkDelete:", ids.join(","));
+      push("delete", { cardId: `${ids.length} cards (bulk)` });
+    },
     enableColumnReorder: columnReorder,
     onColumnsReorder: (keys: string[]) => {
       // eslint-disable-next-line no-console
@@ -664,6 +678,13 @@ const App = () => {
               onClick={() => setColumnReorder((v) => !v)}
             >
               Reorder columns
+            </button>
+            <button
+              className="btn toggle"
+              data-on={multiSelect}
+              onClick={() => setMultiSelect((v) => !v)}
+            >
+              Multi-select
             </button>
             <button
               className="btn ghost tiny"
