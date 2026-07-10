@@ -300,6 +300,36 @@ const App = () => {
 export default App;
 ```
 
+## Activity log
+
+`useActivityLog` builds a lightweight per-card audit trail from the board's
+callbacks (moved / renamed / deleted):
+
+```jsx
+import { useActivityLog } from "react-custom-kanban-board";
+
+const log = useActivityLog({ actor: "you", limit: 50 });
+
+<KanbanBoard
+  columns={columns}
+  initialCards={cards}
+  columnForAddCard="todo"
+  onCardMove={log.onCardMove}
+  onCardEdit={log.onCardEdit}
+  onCardDelete={log.onCardDelete}
+/>;
+
+{log.entries.map((e) => (
+  <li key={e.id}>
+    {e.cardId} {e.detail} {e.actor && `· by ${e.actor}`}
+  </li>
+))}
+```
+
+Each entry has `{ id, type, cardId, timestamp, detail, actor }`. Use
+`log.record(type, cardId, detail)` to append custom entries and `log.clear()`
+to reset.
+
 ## Custom card fields (typed schema)
 
 Beyond the built-in `priority` / `dueDate` / `tags` / `assignee`, describe your

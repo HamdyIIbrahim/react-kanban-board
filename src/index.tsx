@@ -46,6 +46,8 @@ export type {
   PersistenceAdapter,
   PersistentBoard,
 } from "./usePersistentBoard";
+export { useActivityLog } from "./useActivityLog";
+export type { ActivityEntry, ActivityLog } from "./useActivityLog";
 
 // Prefix used to identify a column's droppable area (vs. a card droppable).
 const COLUMN_DROP_PREFIX = "column:";

@@ -15,6 +15,7 @@ import KanbanBoard, {
   importCardsFromCSV,
   usePersistentBoard,
   PersistenceAdapter,
+  useActivityLog,
 } from "../src/index";
 import "./showcase.css";
 
@@ -410,6 +411,7 @@ const App = () => {
     },
   };
   const persisted = usePersistentBoard(seed, persistAdapter);
+  const activity = useActivityLog({ actor: "you", limit: 20 });
 
   const handleCardMove = (
     cardId: string,
@@ -420,11 +422,13 @@ const App = () => {
     // eslint-disable-next-line no-console
     console.log("onCardMove:", payload);
     push("move", payload);
+    activity.onCardMove(cardId, newStatus, position);
   };
   const handleCardDelete = (cardId: string) => {
     // eslint-disable-next-line no-console
     console.log("onCardDelete:", cardId);
     push("delete", { cardId });
+    activity.onCardDelete(cardId);
   };
   const handleCardsChange = (next: Card[]) => {
     // eslint-disable-next-line no-console
@@ -483,6 +487,7 @@ const App = () => {
     filterConfigs,
     onCardMove: handleCardMove,
     onCardDelete: handleCardDelete,
+    onCardEdit: (id: string, title: string) => activity.onCardEdit(id, title),
     onCardsChange: handleCardsChange,
     deleteConfirmation: deleteMode,
     undoDuration: 3000,
@@ -899,6 +904,30 @@ const App = () => {
           Search &amp; filter above the columns · WIP limit on “In Progress”
         </span>
       </div>
+
+      {activity.entries.length > 0 && (
+        <div className="activity" data-testid="activity-log">
+          <div className="activity-head">
+            <span className="rail-title">Activity log</span>
+            <button
+              className="btn ghost tiny"
+              onClick={activity.clear}
+              data-testid="activity-clear"
+            >
+              clear
+            </button>
+          </div>
+          <ul className="activity-list">
+            {activity.entries.map((e) => (
+              <li key={e.id} className="activity-entry" data-testid="activity-entry">
+                <span className={`activity-dot ${e.type}`} />
+                <b>{e.cardId}</b> {e.detail}
+                {e.actor ? <em> · by {e.actor}</em> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };
