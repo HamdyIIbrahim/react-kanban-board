@@ -1,12 +1,281 @@
 import React, {
   useState,
-  DragEvent,
   ReactNode,
   useEffect,
   useRef,
+  useCallback,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  closestCenter,
+  pointerWithin,
+  useDroppable,
+  type CollisionDetection,
+  type DragStartEvent,
+  type DragEndEvent,
+  type Announcements,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import "./KanbanBoard.css";
+
+export {
+  exportCardsToJSON,
+  exportCardsToCSV,
+  importCardsFromJSON,
+  importCardsFromCSV,
+  validateCard,
+} from "./serialize";
+export { usePersistentBoard } from "./usePersistentBoard";
+export type {
+  PersistenceAdapter,
+  PersistentBoard,
+} from "./usePersistentBoard";
+export { useActivityLog } from "./useActivityLog";
+export type { ActivityEntry, ActivityLog } from "./useActivityLog";
+export { diffCards } from "./realtime";
+export type { CardChange } from "./realtime";
+
+// Prefix used to identify a column's droppable area (vs. a card droppable).
+const COLUMN_DROP_PREFIX = "column:";
+// Prefix used for a column's sortable (drag-to-reorder) id.
+const COLUMN_SORT_PREFIX = "col:";
+
+// Separator between the lane value and the column key in a swimlane droppable.
+const LANE_SEP = "::";
+
+const laneOf = (card: Card, swimlaneBy: string): string =>
+  card[swimlaneBy] === undefined ||
+  card[swimlaneBy] === null ||
+  card[swimlaneBy] === ""
+    ? ""
+    : String(card[swimlaneBy]);
+
+// Reorder computation for swimlane mode. Drop targets encode lane + column, so
+// a move can change both the card's status and its swimlane field.
+function computeSwimlaneReorder(
+  cards: Card[],
+  columns: Column[],
+  activeId: string,
+  overId: string,
+  swimlaneBy: string
+):
+  | { nextCards: Card[]; destColumn: string; position: DropPosition }
+  | { wipBlockedColumn: string }
+  | null {
+  const activeCard = cards.find((c) => c.id === activeId);
+  if (!activeCard) return null;
+
+  let destColumn: string;
+  let destLane: string;
+  if (overId.startsWith(COLUMN_DROP_PREFIX)) {
+    const rest = overId.slice(COLUMN_DROP_PREFIX.length);
+    const idx = rest.indexOf(LANE_SEP);
+    if (idx === -1) return null;
+    destLane = rest.slice(0, idx);
+    destColumn = rest.slice(idx + LANE_SEP.length);
+  } else {
+    const overCard = cards.find((c) => c.id === overId);
+    if (!overCard) return null;
+    destColumn = overCard.status;
+    destLane = laneOf(overCard, swimlaneBy);
+  }
+
+  const isSameCell =
+    activeCard.status === destColumn && laneOf(activeCard, swimlaneBy) === destLane;
+
+  // WIP limit is enforced per column (across lanes).
+  if (activeCard.status !== destColumn) {
+    const limit = columns.find((col) => col.key === destColumn)?.limit;
+    if (limit !== undefined) {
+      const count = cards.filter(
+        (c) => c.status === destColumn && c.id !== activeId
+      ).length;
+      if (count >= limit) return { wipBlockedColumn: destColumn };
+    }
+  }
+
+  const cellIds = (all: Card[]) =>
+    all
+      .filter(
+        (c) =>
+          c.status === destColumn &&
+          laneOf(c, swimlaneBy) === destLane &&
+          c.id !== activeId
+      )
+      .map((c) => c.id);
+
+  let beforeId: string;
+  if (overId.startsWith(COLUMN_DROP_PREFIX)) {
+    beforeId = "-1";
+  } else {
+    const listNoActive = cellIds(cards);
+    const fullList = cards
+      .filter(
+        (c) => c.status === destColumn && laneOf(c, swimlaneBy) === destLane
+      )
+      .map((c) => c.id);
+    const activeIdx = fullList.indexOf(activeId);
+    const overIdx = fullList.indexOf(overId);
+    const overPos = listNoActive.indexOf(overId);
+    const insertPos =
+      isSameCell && activeIdx !== -1 && activeIdx < overIdx
+        ? overPos + 1
+        : overPos;
+    beforeId = listNoActive[insertPos] ?? "-1";
+  }
+
+  const rest = cards.filter((c) => c.id !== activeId);
+  const updated: Card = isSameCell
+    ? activeCard
+    : { ...activeCard, status: destColumn, [swimlaneBy]: destLane };
+  if (beforeId === "-1") {
+    rest.push(updated);
+  } else {
+    const idx = rest.findIndex((c) => c.id === beforeId);
+    if (idx === -1) rest.push(updated);
+    else rest.splice(idx, 0, updated);
+  }
+
+  const cell = rest.filter(
+    (c) => c.status === destColumn && laneOf(c, swimlaneBy) === destLane
+  );
+  const indexInCell = cell.findIndex((c) => c.id === activeId);
+  const position: DropPosition = {
+    prevTaskId: cell[indexInCell - 1]?.id ?? null,
+    nextTaskId: cell[indexInCell + 1]?.id ?? null,
+    index: indexInCell,
+  };
+  return { nextCards: rest, destColumn, position };
+}
+
+// Collision strategy:
+// - Column drags snap to sibling column sortables only.
+// - Swimlane card drags use pointer-based hit-testing so a card lands in the
+//   lane actually under the pointer (closestCorners misfires across stacked
+//   lanes).
+// - Plain card drags use closestCorners.
+const makeBoardCollisionDetection = (
+  swimlaneMode: boolean
+): CollisionDetection => (args) => {
+  if (String(args.active.id).startsWith(COLUMN_SORT_PREFIX)) {
+    const columnContainers = args.droppableContainers.filter((c) =>
+      String(c.id).startsWith(COLUMN_SORT_PREFIX)
+    );
+    return closestCenter({ ...args, droppableContainers: columnContainers });
+  }
+  if (swimlaneMode) {
+    const hits = pointerWithin(args);
+    return hits.length ? hits : closestCenter(args);
+  }
+  return closestCorners(args);
+};
+
+// Pure reorder computation shared by pointer, touch and keyboard dragging.
+// Translates a dnd-kit (activeId, overId) into the next flat card list plus the
+// drop position within the destination column. `overId` may be a card id or a
+// `column:<key>` droppable id. Returns `wipBlockedColumn` instead of a result
+// when the move would exceed a destination column's WIP limit.
+function computeReorder(
+  cards: Card[],
+  columns: Column[],
+  activeId: string,
+  overId: string
+):
+  | { nextCards: Card[]; destColumn: string; position: DropPosition }
+  | { wipBlockedColumn: string }
+  | null {
+  const activeCard = cards.find((c) => c.id === activeId);
+  if (!activeCard) return null;
+
+  const destColumn = overId.startsWith(COLUMN_DROP_PREFIX)
+    ? overId.slice(COLUMN_DROP_PREFIX.length)
+    : cards.find((c) => c.id === overId)?.status;
+  if (destColumn === undefined) return null;
+
+  const sourceColumn = activeCard.status;
+  const isSameColumn = sourceColumn === destColumn;
+
+  // WIP limit check for cross-column moves.
+  if (!isSameColumn) {
+    const limit = columns.find((col) => col.key === destColumn)?.limit;
+    if (limit !== undefined) {
+      const count = cards.filter(
+        (c) => c.status === destColumn && c.id !== activeId
+      ).length;
+      if (count >= limit) return { wipBlockedColumn: destColumn };
+    }
+  }
+
+  // Determine the card the active card should be inserted before ("-1" = end),
+  // honoring drag direction within a column.
+  const destListNoActive = cards
+    .filter((c) => c.status === destColumn && c.id !== activeId)
+    .map((c) => c.id);
+
+  let beforeId: string;
+  if (overId.startsWith(COLUMN_DROP_PREFIX)) {
+    beforeId = "-1";
+  } else {
+    const fullDestList = cards
+      .filter((c) => c.status === destColumn)
+      .map((c) => c.id);
+    const activeIdx = fullDestList.indexOf(activeId);
+    const overIdx = fullDestList.indexOf(overId);
+    const overPos = destListNoActive.indexOf(overId);
+    const insertPos =
+      isSameColumn && activeIdx !== -1 && activeIdx < overIdx
+        ? overPos + 1
+        : overPos;
+    beforeId = destListNoActive[insertPos] ?? "-1";
+  }
+
+  // No-op: dropping right back where it already is.
+  const currentBefore =
+    cards.filter((c) => c.status === sourceColumn).map((c) => c.id)[
+      cards.filter((c) => c.status === sourceColumn).findIndex((c) => c.id === activeId) + 1
+    ] ?? "-1";
+  if (isSameColumn && beforeId === activeId) return null;
+  if (isSameColumn && beforeId === currentBefore) return null;
+
+  const rest = cards.filter((c) => c.id !== activeId);
+  const updated = isSameColumn
+    ? activeCard
+    : { ...activeCard, status: destColumn };
+  if (beforeId === "-1") {
+    rest.push(updated);
+  } else {
+    const idx = rest.findIndex((c) => c.id === beforeId);
+    if (idx === -1) rest.push(updated);
+    else rest.splice(idx, 0, updated);
+  }
+
+  const columnCards = rest.filter((c) => c.status === destColumn);
+  const indexInColumn = columnCards.findIndex((c) => c.id === activeId);
+  const position: DropPosition = {
+    prevTaskId: columnCards[indexInColumn - 1]?.id ?? null,
+    nextTaskId: columnCards[indexInColumn + 1]?.id ?? null,
+    index: indexInColumn,
+  };
+
+  return { nextCards: rest, destColumn, position };
+}
 
 export interface Card {
   id: string;
@@ -26,6 +295,8 @@ export interface Column {
   key: string;
   color: string;
   limit?: number; // Optional WIP limit
+  isLoading?: boolean; // Optional per-column loading state (e.g. lazy-loaded data)
+  emptyMessage?: string; // Optional per-column empty message (overrides emptyColumnMessage)
 }
 
 // New filter interfaces for dynamic filtering
@@ -40,6 +311,38 @@ export interface FilterConfig {
   options: FilterOption[];
 }
 
+// Describes a custom card field beyond the built-in ones, so consumers get a
+// typed schema instead of relying on the loose `[key: string]: any`. Schema
+// fields are rendered in the default card's expanded details and can be
+// validated with `validateCard`.
+export interface CardFieldDef {
+  key: string;
+  label: string;
+  type?: "text" | "number" | "date" | "select" | "tags";
+  options?: FilterOption[]; // for type: "select"
+  required?: boolean;
+}
+
+// How a card deletion is guarded before onCardDelete is fired.
+// - "immediate": fire onCardDelete right away (default, backwards compatible)
+// - "confirm":   show an inline confirmation prompt first
+// - "undo":      remove the card immediately but defer onCardDelete, showing a
+//                brief undo toast that can restore the card
+export type DeleteConfirmation = "immediate" | "confirm" | "undo";
+
+// Position information about where a card landed within its destination column,
+// exposed through onCardMove so consumers can persist ordering on a backend.
+export interface DropPosition {
+  // Id of the card immediately before the dropped card in the destination
+  // column, or null if it was dropped at the top.
+  prevTaskId: string | null;
+  // Id of the card immediately after the dropped card in the destination
+  // column, or null if it was dropped at the bottom.
+  nextTaskId: string | null;
+  // Zero-based index of the dropped card within the destination column.
+  index: number;
+}
+
 interface DefaultCardProps {
   title: string;
   avatarPath?: string;
@@ -49,32 +352,51 @@ interface DefaultCardProps {
   dueDate?: string;
   tags?: string[];
   description?: string;
-  handleDragStart: (
-    e: any,
-    card: { title: string; id: string; status: string }
-  ) => void;
   renderAvatar?: (avatarPath?: string) => ReactNode;
   children?: ReactNode;
   isExpanded?: boolean;
   toggleExpand?: (id: string) => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
+  isDragging?: boolean; // true for the source card while it is being dragged
+  isOverlay?: boolean; // true when rendered inside the DragOverlay preview
+  card?: Card; // full card, for reading schema field values
+  cardFields?: CardFieldDef[]; // custom field schema to render in details
 }
 
-interface KanbanBoardProps {
+// Signature for custom card renderers. `isDragging` is true for the card being
+// dragged (and for the drag overlay copy).
+export type RenderCard = (
+  card: Card,
+  isDragging?: boolean,
+  isExpanded?: boolean,
+  toggleExpand?: (id: string) => void
+) => ReactNode;
+
+export interface KanbanBoardProps {
   columns: Column[];
-  initialCards: Card[];
+  // Uncontrolled mode: the board owns card state, seeded once from initialCards.
+  initialCards?: Card[];
+  // Controlled mode: when provided, the board renders these cards directly and
+  // never mutates internal state. Pair with onCardsChange to receive updates.
+  cards?: Card[];
+  // Called with the full next card list on every internal mutation (move, edit,
+  // delete, add). Required for controlled mode; also fires in uncontrolled mode.
+  onCardsChange?: (cards: Card[]) => void;
+  // Applied to the board root — use it to scope a theme (e.g. "kb-dark") or set
+  // --kb-* CSS variables via `style`.
+  className?: string;
+  style?: React.CSSProperties;
   columnForAddCard: string;
-  onCardMove?: (cardId: string, newStatus: string) => void;
+  onCardMove?: (
+    cardId: string,
+    newStatus: string,
+    position: DropPosition
+  ) => void;
   onCardEdit?: (cardId: string, newTitle: string) => void;
   onCardDelete?: (cardId: string) => void;
   onTaskAddedCallback?: (title: string) => void;
-  renderCard?: (
-    card: Card,
-    handleDragStart: (e: DragEvent<HTMLDivElement>, card: Card) => void,
-    isExpanded?: boolean,
-    toggleExpand?: (id: string) => void
-  ) => ReactNode;
+  renderCard?: RenderCard;
   renderAvatar?: (avatarPath?: string) => ReactNode;
   renderAddCard?: (
     column: string,
@@ -83,6 +405,36 @@ interface KanbanBoardProps {
   isLoading?: boolean;
   loadingComponent?: ReactNode;
   emptyColumnMessage?: string;
+  // Custom per-column loading UI, shown when a column has isLoading set.
+  renderColumnLoading?: (column: Column) => ReactNode;
+  // How to guard card deletion before onCardDelete fires. Defaults to "immediate".
+  deleteConfirmation?: DeleteConfirmation;
+  // How long the undo toast stays before the delete is committed (ms). Default 5000.
+  undoDuration?: number;
+  // Optional typed schema for custom card fields; rendered in card details.
+  cardFields?: CardFieldDef[];
+  // Group cards into horizontal swimlanes by a card field (e.g. "assignee").
+  swimlaneBy?: string;
+  // Optional explicit swimlanes (value + label + order). Derived from card
+  // values when omitted.
+  swimlanes?: { value: string; label: string }[];
+  // Enable drag-to-reorder of columns (via a grip in each column header).
+  // Off by default.
+  enableColumnReorder?: boolean;
+  // Called with the new ordered column keys after a column is reordered.
+  onColumnsReorder?: (orderedKeys: string[]) => void;
+  // Enable multi-select (Cmd/Ctrl-click to toggle, Shift-click for a range)
+  // with a bulk action bar. Off by default.
+  enableMultiSelect?: boolean;
+  // Called when selected cards are moved to a column in bulk.
+  onBulkMove?: (cardIds: string[], newStatus: string) => void;
+  // Called when selected cards are deleted in bulk.
+  onBulkDelete?: (cardIds: string[]) => void;
+  // Virtualize (window) a column's card list once it exceeds this many cards.
+  // Off by default. Keeps very large columns (hundreds of cards) performant.
+  virtualizeColumnsOver?: number;
+  // Estimated card height in px, used by the virtualizer. Default 120.
+  virtualItemEstimatedHeight?: number;
   enableSearch?: boolean;
   enableFiltering?: boolean;
   filterConfigs?: FilterConfig[]; // New prop for custom filters
@@ -106,16 +458,10 @@ interface ColumnProps {
   setCards: React.Dispatch<React.SetStateAction<Card[]>>;
   color: string;
   limit?: number;
-  onCardMove?: (cardId: string, newStatus: string) => void;
   onCardEdit?: (cardId: string, newTitle: string) => void;
   onCardDelete?: (cardId: string) => void;
   onTaskAddedCallback?: (title: string) => void;
-  renderCard?: (
-    card: Card,
-    handleDragStart: (e: DragEvent<HTMLDivElement>, card: Card) => void,
-    isExpanded?: boolean,
-    toggleExpand?: (id: string) => void
-  ) => ReactNode;
+  renderCard?: RenderCard;
   renderAvatar?: (avatarPath?: string) => ReactNode;
   renderAddCard?: (
     column: string,
@@ -123,6 +469,25 @@ interface ColumnProps {
   ) => ReactNode;
   emptyColumnMessage?: string;
   filteredCards: Card[];
+  deleteConfirmation: DeleteConfirmation;
+  undoDuration: number;
+  isColumnLoading?: boolean;
+  emptyMessage?: string;
+  renderColumnLoading?: (column: Column) => ReactNode;
+  columnData: Column;
+  isWipBlocked: boolean;
+  virtualizeColumnsOver?: number;
+  virtualItemEstimatedHeight?: number;
+  columnDragHandle?: { attributes: any; listeners: any };
+  enableMultiSelect?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (
+    cardId: string,
+    e: React.MouseEvent,
+    columnCardIds: string[]
+  ) => void;
+  cardFields?: CardFieldDef[];
+  laneValue?: string; // swimlane value; scopes the column's droppable id
 }
 
 interface AddCardProps {
@@ -251,10 +616,23 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Default per-column loading placeholder (skeleton cards).
+const ColumnLoadingState = () => (
+  <div className="column-loading" aria-busy="true" aria-live="polite">
+    {[0, 1, 2].map((i) => (
+      <div className="column-skeleton-card" key={i} />
+    ))}
+  </div>
+);
+
 const KanbanBoard = ({
   columns,
   columnForAddCard,
-  initialCards,
+  initialCards = [],
+  cards: controlledCards,
+  onCardsChange,
+  className,
+  style,
   onCardMove,
   onCardEdit,
   onCardDelete,
@@ -265,6 +643,19 @@ const KanbanBoard = ({
   isLoading = false,
   loadingComponent,
   emptyColumnMessage = "No cards yet",
+  renderColumnLoading,
+  deleteConfirmation = "immediate",
+  undoDuration = 5000,
+  cardFields,
+  swimlaneBy,
+  swimlanes,
+  enableColumnReorder = false,
+  onColumnsReorder,
+  enableMultiSelect = false,
+  onBulkMove,
+  onBulkDelete,
+  virtualizeColumnsOver,
+  virtualItemEstimatedHeight = 120,
   enableSearch = false,
   enableFiltering = false,
   filterConfigs = [],
@@ -272,16 +663,217 @@ const KanbanBoard = ({
   renderSearchInput,
   renderFilterMenu,
 }: KanbanBoardProps) => {
-  const [cards, setCards] = useState<Card[]>(initialCards);
+  // Controlled vs. uncontrolled: if `cards` is provided the board renders it
+  // directly and never touches internal state; otherwise it owns the state,
+  // seeded once from `initialCards`.
+  const isControlled = controlledCards !== undefined;
+  const [internalCards, setInternalCards] = useState<Card[]>(initialCards);
+  const cards = isControlled ? (controlledCards as Card[]) : internalCards;
+
+  // Refs keep the stable setCards closure below reading the latest values.
+  const cardsRef = useRef<Card[]>(cards);
+  cardsRef.current = cards;
+  const isControlledRef = useRef(isControlled);
+  isControlledRef.current = isControlled;
+  const onCardsChangeRef = useRef(onCardsChange);
+  onCardsChangeRef.current = onCardsChange;
+
+  // Drop-in replacement for the old setCards, kept stable across renders.
+  // Accepts a value or updater, updates internal state (uncontrolled only) and
+  // always notifies via onCardsChange so controlled consumers can persist.
+  const setCards = useCallback<
+    React.Dispatch<React.SetStateAction<Card[]>>
+  >((update) => {
+    const base = cardsRef.current;
+    const next =
+      typeof update === "function"
+        ? (update as (prev: Card[]) => Card[])(base)
+        : update;
+    cardsRef.current = next;
+    if (!isControlledRef.current) setInternalCards(next);
+    onCardsChangeRef.current?.(next);
+  }, []);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<Record<string, string | null>>({});
-  const [filteredCards, setFilteredCards] = useState<Card[]>(initialCards);
+  const [filteredCards, setFilteredCards] = useState<Card[]>(cards);
 
   const boardRef = useRef<HTMLDivElement>(null);
 
+  // ---- Column order (for optional drag-to-reorder) ----
+  const [columnOrder, setColumnOrder] = useState<string[]>(() =>
+    columns.map((c) => c.key)
+  );
+  // Reconcile when the set of column keys changes (kept order + new appended).
   useEffect(() => {
-    setCards(initialCards);
-  }, [initialCards]);
+    setColumnOrder((prev) => {
+      const keys = columns.map((c) => c.key);
+      const kept = prev.filter((k) => keys.includes(k));
+      const added = keys.filter((k) => !kept.includes(k));
+      const next = [...kept, ...added];
+      return next.length === prev.length && next.every((k, i) => k === prev[i])
+        ? prev
+        : next;
+    });
+  }, [columns]);
+  const orderedColumns = enableColumnReorder
+    ? (columnOrder
+        .map((k) => columns.find((c) => c.key === k))
+        .filter(Boolean) as Column[])
+    : columns;
+
+  // ---- Drag and drop (pointer, touch, keyboard via dnd-kit) ----
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [wipBlockedColumn, setWipBlockedColumn] = useState<string | null>(null);
+  const wipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sensors = useSensors(
+    // Mouse: small distance so clicks on card buttons don't start a drag.
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    // Touch: short press-and-hold to begin a drag (lets touch scrolling work).
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const activeCard = activeCardId
+    ? cardsRef.current.find((c) => c.id === activeCardId) ?? null
+    : null;
+
+  // ---- Multi-select ----
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const lastSelectedRef = useRef<string | null>(null);
+
+  const handleToggleSelect = useCallback(
+    (cardId: string, e: React.MouseEvent, columnCardIds: string[]) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (e.shiftKey && lastSelectedRef.current) {
+          const a = columnCardIds.indexOf(lastSelectedRef.current);
+          const b = columnCardIds.indexOf(cardId);
+          if (a !== -1 && b !== -1) {
+            const [lo, hi] = a < b ? [a, b] : [b, a];
+            for (let i = lo; i <= hi; i++) next.add(columnCardIds[i]);
+            return next;
+          }
+        }
+        if (e.metaKey || e.ctrlKey) {
+          next.has(cardId) ? next.delete(cardId) : next.add(cardId);
+        } else {
+          next.clear();
+          next.add(cardId);
+        }
+        return next;
+      });
+      lastSelectedRef.current = cardId;
+    },
+    []
+  );
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const bulkMove = (newStatus: string) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setCards((prev) => {
+      const moved = prev.filter((c) => selectedIds.has(c.id));
+      const rest = prev.filter((c) => !selectedIds.has(c.id));
+      return [...rest, ...moved.map((c) => ({ ...c, status: newStatus }))];
+    });
+    onBulkMove?.(ids, newStatus);
+    clearSelection();
+  };
+
+  const bulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setCards((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+    onBulkDelete?.(ids);
+    clearSelection();
+  };
+
+  const flashWipBlocked = (columnKey: string) => {
+    setWipBlockedColumn(columnKey);
+    if (wipTimerRef.current) clearTimeout(wipTimerRef.current);
+    wipTimerRef.current = setTimeout(() => setWipBlockedColumn(null), 2000);
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    // Column drags aren't tracked for the card overlay.
+    if (String(event.active.id).startsWith(COLUMN_SORT_PREFIX)) return;
+    setActiveCardId(String(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveCardId(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    // Column reorder.
+    if (String(active.id).startsWith(COLUMN_SORT_PREFIX)) {
+      if (!String(over.id).startsWith(COLUMN_SORT_PREFIX)) return;
+      const from = String(active.id).slice(COLUMN_SORT_PREFIX.length);
+      const to = String(over.id).slice(COLUMN_SORT_PREFIX.length);
+      if (from === to) return;
+      setColumnOrder((prev) => {
+        const next = arrayMove(prev, prev.indexOf(from), prev.indexOf(to));
+        onColumnsReorder?.(next);
+        return next;
+      });
+      return;
+    }
+
+    const result = swimlaneBy
+      ? computeSwimlaneReorder(
+          cardsRef.current,
+          columns,
+          String(active.id),
+          String(over.id),
+          swimlaneBy
+        )
+      : computeReorder(
+          cardsRef.current,
+          columns,
+          String(active.id),
+          String(over.id)
+        );
+    if (!result) return;
+    if ("wipBlockedColumn" in result) {
+      flashWipBlocked(result.wipBlockedColumn);
+      return;
+    }
+
+    setCards(result.nextCards);
+    onCardMove?.(String(active.id), result.destColumn, result.position);
+  };
+
+  const handleDragCancel = () => setActiveCardId(null);
+
+  useEffect(() => {
+    return () => {
+      if (wipTimerRef.current) clearTimeout(wipTimerRef.current);
+    };
+  }, []);
+
+  // Screen-reader announcements for keyboard / assistive-tech dragging.
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Picked up card ${active.id}.`,
+    onDragOver: ({ active, over }) =>
+      over
+        ? `Card ${active.id} is over ${String(over.id).replace(
+            COLUMN_DROP_PREFIX,
+            "column "
+          )}.`
+        : `Card ${active.id} is no longer over a drop target.`,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `Card ${active.id} was dropped.`
+        : `Card ${active.id} was dropped back to its position.`,
+    onDragCancel: ({ active }) => `Dragging card ${active.id} was cancelled.`,
+  };
 
   // Handle filter change
   const handleFilterChange = (field: string, value: string | null) => {
@@ -333,14 +925,85 @@ const KanbanBoard = ({
 
   if (isLoading) {
     return (
-      <div className="kanban-board-container">
+      <div className={`kanban-board-container ${className || ""}`} style={style}>
         {loadingComponent || <LoadingSpinner />}
       </div>
     );
   }
 
+  const renderColumn = (
+    column: Column,
+    columnDragHandle?: { attributes: any; listeners: any },
+    laneValue?: string
+  ) => (
+    <ColumnComponent
+      title={column.title}
+      column={column.key}
+      cards={cards}
+      filteredCards={filteredCards.filter(
+        (card) =>
+          card.status === column.key &&
+          (laneValue === undefined ||
+            !swimlaneBy ||
+            laneOf(card, swimlaneBy) === laneValue)
+      )}
+      setCards={setCards}
+      color={column.color}
+      limit={column.limit}
+      onCardEdit={onCardEdit}
+      onCardDelete={onCardDelete}
+      renderCard={renderCard}
+      renderAvatar={renderAvatar}
+      renderAddCard={renderAddCard}
+      onTaskAddedCallback={onTaskAddedCallback}
+      columnForAddCard={columnForAddCard}
+      emptyColumnMessage={emptyColumnMessage}
+      deleteConfirmation={deleteConfirmation}
+      undoDuration={undoDuration}
+      isColumnLoading={column.isLoading}
+      emptyMessage={column.emptyMessage}
+      renderColumnLoading={renderColumnLoading}
+      columnData={column}
+      isWipBlocked={wipBlockedColumn === column.key}
+      virtualizeColumnsOver={virtualizeColumnsOver}
+      virtualItemEstimatedHeight={virtualItemEstimatedHeight}
+      columnDragHandle={columnDragHandle}
+      enableMultiSelect={enableMultiSelect}
+      selectedIds={selectedIds}
+      onToggleSelect={handleToggleSelect}
+      cardFields={cardFields}
+      laneValue={laneValue}
+    />
+  );
+
+  // Derive swimlanes (explicit, or from card field values + an ungrouped lane).
+  const laneList: { value: string; label: string }[] = (() => {
+    if (!swimlaneBy) return [];
+    if (swimlanes && swimlanes.length) return swimlanes;
+    const seen = new Set<string>();
+    const lanes: { value: string; label: string }[] = [];
+    let hasUngrouped = false;
+    for (const c of cards) {
+      const v = laneOf(c, swimlaneBy);
+      if (v === "") {
+        hasUngrouped = true;
+        continue;
+      }
+      if (!seen.has(v)) {
+        seen.add(v);
+        lanes.push({ value: v, label: v });
+      }
+    }
+    if (hasUngrouped) lanes.push({ value: "", label: "Ungrouped" });
+    return lanes;
+  })();
+
   return (
-    <div className="kanban-board-container" ref={boardRef}>
+    <div
+      className={`kanban-board-container ${className || ""}`}
+      style={style}
+      ref={boardRef}
+    >
       {(enableSearch || (enableFiltering && filterConfigs.length > 0)) && (
         <div className="kanban-search">
           {enableSearch && (
@@ -424,33 +1087,142 @@ const KanbanBoard = ({
         </div>
       )}
 
-      <div className="kanban-board">
-        {columns.map((column) => (
-          <ColumnComponent
-            key={column.key}
-            title={column.title}
-            column={column.key}
-            cards={cards}
-            filteredCards={filteredCards.filter(
-              (card) => card.status === column.key
+      <DndContext
+        sensors={sensors}
+        collisionDetection={makeBoardCollisionDetection(!!swimlaneBy)}
+        accessibility={{ announcements }}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        {swimlaneBy ? (
+          <div className="kanban-swimlanes">
+            {laneList.map((lane) => (
+              <div
+                className="swimlane"
+                key={lane.value || "__ungrouped"}
+                data-testid={`swimlane-${lane.value || "ungrouped"}`}
+              >
+                <div className="swimlane-header">
+                  <span className="swimlane-title">{lane.label}</span>
+                  <span className="swimlane-count">
+                    {
+                      cards.filter(
+                        (c) => laneOf(c, swimlaneBy) === lane.value
+                      ).length
+                    }
+                  </span>
+                </div>
+                <div className="kanban-board">
+                  {orderedColumns.map((column) => (
+                    <React.Fragment key={`${lane.value}-${column.key}`}>
+                      {renderColumn(column, undefined, lane.value)}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="kanban-board">
+            {enableColumnReorder ? (
+              <SortableContext
+                items={orderedColumns.map((c) => COLUMN_SORT_PREFIX + c.key)}
+                strategy={horizontalListSortingStrategy}
+              >
+                {orderedColumns.map((column) => (
+                  <SortableColumn
+                    key={column.key}
+                    id={COLUMN_SORT_PREFIX + column.key}
+                  >
+                    {(handle) => renderColumn(column, handle)}
+                  </SortableColumn>
+                ))}
+              </SortableContext>
+            ) : (
+              orderedColumns.map((column) => (
+                <React.Fragment key={column.key}>
+                  {renderColumn(column)}
+                </React.Fragment>
+              ))
             )}
-            setCards={setCards}
-            color={column.color}
-            limit={column.limit}
-            onCardMove={onCardMove}
-            onCardEdit={onCardEdit}
-            onCardDelete={onCardDelete}
-            renderCard={renderCard}
-            renderAvatar={renderAvatar}
-            renderAddCard={renderAddCard}
-            onTaskAddedCallback={onTaskAddedCallback}
-            columnForAddCard={columnForAddCard}
-            emptyColumnMessage={emptyColumnMessage}
-          />
-        ))}
-      </div>
+          </div>
+        )}
+        {enableMultiSelect && selectedIds.size > 0 && (
+          <div
+            className="bulk-action-bar"
+            role="toolbar"
+            aria-label="Bulk actions"
+            data-testid="bulk-bar"
+          >
+            <span className="bulk-count" data-testid="bulk-count">
+              {selectedIds.size} selected
+            </span>
+            <span className="bulk-move-label">Move to</span>
+            {columns.map((col) => (
+              <button
+                key={col.key}
+                type="button"
+                className="bulk-btn"
+                data-testid={`bulk-move-${col.key}`}
+                onClick={() => bulkMove(col.key)}
+              >
+                {col.title}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="bulk-btn danger"
+              data-testid="bulk-delete"
+              onClick={bulkDelete}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className="bulk-btn ghost"
+              data-testid="bulk-clear"
+              onClick={clearSelection}
+            >
+              Clear
+            </button>
+          </div>
+        )}
+        <DragOverlay dropAnimation={null}>
+          {activeCard ? (
+            <div className={`card-drag-overlay ${className || ""}`}>
+              {renderCard ? (
+                renderCard(activeCard, undefined, undefined, undefined)
+              ) : (
+                <DefaultCard
+                  {...activeCard}
+                  renderAvatar={renderAvatar}
+                  isExpanded={false}
+                  isOverlay
+                />
+              )}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
+};
+
+// Props for the explicit controlled variant: `cards` and `onCardsChange` are
+// required, and the uncontrolled-only `initialCards` is not accepted.
+export type ControlledKanbanBoardProps = Omit<
+  KanbanBoardProps,
+  "initialCards" | "cards" | "onCardsChange"
+> & {
+  cards: Card[];
+  onCardsChange: (cards: Card[]) => void;
+};
+
+// Explicit controlled board for consumers wiring state to a backend. This is a
+// thin wrapper over KanbanBoard that makes the controlled contract type-safe.
+export const ControlledKanbanBoard = (props: ControlledKanbanBoardProps) => {
+  return <KanbanBoard {...props} />;
 };
 
 const ColumnComponent: React.FC<ColumnProps> = ({
@@ -462,7 +1234,6 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   columnForAddCard,
   color,
   limit,
-  onCardMove,
   onCardEdit,
   onCardDelete,
   renderCard,
@@ -470,200 +1241,137 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   renderAddCard,
   onTaskAddedCallback,
   emptyColumnMessage,
+  deleteConfirmation,
+  undoDuration,
+  isColumnLoading,
+  emptyMessage,
+  renderColumnLoading,
+  columnData,
+  isWipBlocked,
+  virtualizeColumnsOver,
+  virtualItemEstimatedHeight = 120,
+  columnDragHandle,
+  enableMultiSelect,
+  selectedIds,
+  onToggleSelect,
+  cardFields,
+  laneValue,
 }) => {
-  const [active, setActive] = useState(false);
+  // Column-level droppable so empty columns and gaps still accept drops. In
+  // swimlane mode the id also encodes the lane.
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id:
+      laneValue !== undefined
+        ? `${COLUMN_DROP_PREFIX}${laneValue}${LANE_SEP}${column}`
+        : `${COLUMN_DROP_PREFIX}${column}`,
+  });
+  const shouldVirtualize =
+    virtualizeColumnsOver !== undefined &&
+    !isColumnLoading &&
+    filteredCards.length > virtualizeColumnsOver;
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState<string>("");
   const [expandedCards, setExpandedCards] = useState<{
     [key: string]: boolean;
   }>({});
+  // Id of the card awaiting an inline delete confirmation ("confirm" mode).
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(
+    null
+  );
+  // Card removed from view but not yet committed ("undo" mode).
+  const [pendingDelete, setPendingDelete] = useState<{
+    card: Card;
+    index: number;
+  } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const columnRef = useRef<HTMLDivElement>(null);
   const isLimitExceeded = limit !== undefined && filteredCards.length > limit;
 
   const columnStyle = {
     backgroundColor: color,
   };
 
-  const handleDragStart = (e: DragEvent<HTMLDivElement>, card: Card) => {
-    e.dataTransfer.setData("cardId", card.id);
-
-    // Create and set custom drag image
-    const dragPreview = document.createElement("div");
-    dragPreview.className = "card-drag-preview";
-    dragPreview.textContent =
-      card.title.length > 25 ? card.title.substring(0, 25) + "..." : card.title;
-    document.body.appendChild(dragPreview);
-    e.dataTransfer.setDragImage(dragPreview, 20, 20);
-
-    // Remove after drag ends
-    setTimeout(() => {
-      if (document.body.contains(dragPreview)) {
-        document.body.removeChild(dragPreview);
-      }
-    }, 0);
-  };
-
   const toggleExpand = (id: string) => {
     setExpandedCards((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleDragEnd = (e: DragEvent<HTMLDivElement>) => {
-    const cardId = e.dataTransfer.getData("cardId");
-
-    setActive(false);
-    clearHighlights();
-
-    // Get all drop indicators in the current column
-    const indicators = getIndicators();
-
-    // Find the nearest indicator based on mouse position
-    const { element } = getNearestIndicator(e, indicators);
-
-    // Get the ID of the card before which to insert the dragged card
-    const before = element.dataset.before || "-1";
-
-    // Only proceed if we're not trying to place the card in its original position
-    if (before !== cardId) {
-      let copy = [...cards];
-
-      // Find the card being dragged
-      const cardToMove = copy.find((c) => c.id === cardId);
-      if (!cardToMove) return;
-
-      // Get the current status of the card
-      const currentStatus = cardToMove.status;
-      const isSameColumn = currentStatus === column;
-
-      // If moving to a different column, check column limits
-      if (!isSameColumn && limit !== undefined) {
-        const columnCardCount = copy.filter(
-          (c) => c.status === column && c.id !== cardId
-        ).length;
-
-        // If moving to this column would exceed the limit
-        if (columnCardCount >= limit) {
-          showWipLimitNotification(columnRef.current);
-          return;
-        }
-      }
-
-      // Remove the card from its original position
-      copy = copy.filter((c) => c.id !== cardId);
-
-      // Create updated card with new status if column changed
-      const updatedCard = isSameColumn
-        ? cardToMove
-        : { ...cardToMove, status: column };
-
-      // Determine if we're adding the card to the end of the column
-      const moveToBack = before === "-1";
-
-      if (moveToBack) {
-        // Add the card to the end of the array
-        copy.push(updatedCard);
-      } else {
-        // Find the index where to insert the card
-        const insertAtIndex = copy.findIndex((el) => el.id === before);
-        if (insertAtIndex === -1) return; // Invalid index
-
-        // Insert the card at the proper position
-        copy.splice(insertAtIndex, 0, updatedCard);
-      }
-
-      // Update state and trigger callback if the column changed
-      setCards(copy);
-      if (!isSameColumn) {
-        onCardMove?.(cardId, column);
-      }
-    }
-  };
-
-  const showWipLimitNotification = (columnEl: HTMLDivElement | null) => {
-    if (!columnEl) return;
-
-    const notification = document.createElement("div");
-    notification.className = "wip-limit-notification";
-    notification.textContent = `WIP limit (${limit}) reached!`;
-
-    columnEl.appendChild(notification);
-
-    setTimeout(() => {
-      notification.classList.add("show");
-
-      setTimeout(() => {
-        notification.classList.remove("show");
-        setTimeout(() => {
-          if (columnEl.contains(notification)) {
-            columnEl.removeChild(notification);
-          }
-        }, 300);
-      }, 2000);
-    }, 10);
-  };
-
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    highlightIndicator(e);
-    setActive(true);
-  };
-
-  const clearHighlights = (els?: HTMLElement[]) => {
-    const indicators = els || getIndicators();
-    indicators.forEach((i: any) => {
-      i.style.opacity = "0";
-    });
-  };
-
-  const highlightIndicator = (e: DragEvent<HTMLDivElement>) => {
-    const indicators = getIndicators();
-    clearHighlights(indicators);
-    const el = getNearestIndicator(e, indicators);
-    el.element.style.opacity = "1";
-  };
-
-  // Improved getNearestIndicator for better accuracy in finding drop targets
-  const getNearestIndicator = (
-    e: DragEvent<HTMLDivElement>,
-    indicators: HTMLElement[]
-  ) => {
-    const DISTANCE_OFFSET = 50;
-
-    // Calculate the position of each indicator relative to mouse
-    const el = indicators.reduce(
-      (closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = e.clientY - (box.top + DISTANCE_OFFSET);
-
-        // If this indicator is closer to the mouse than our current closest
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        } else {
-          return closest;
-        }
-      },
-      {
-        offset: Number.NEGATIVE_INFINITY,
-        element: indicators[indicators.length - 1],
-      }
-    );
-
-    return el;
-  };
-
-  const handleDragLeave = () => {
-    clearHighlights();
-    setActive(false);
-  };
-
-  const getIndicators = (): HTMLElement[] => {
-    return Array.from(document.querySelectorAll(`[data-column="${column}"]`));
-  };
-
-  const handleDeleteCard = (cardId: string) => {
+  // Immediately remove a card and notify the consumer.
+  const commitDelete = (cardId: string) => {
     if (onCardDelete) onCardDelete(cardId);
     setCards((prevCards) => prevCards.filter((card) => card.id !== cardId));
   };
+
+  // Flush an in-flight "undo" deletion (commit it now).
+  const flushPendingDelete = () => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setPendingDelete((pending) => {
+      if (pending && onCardDelete) onCardDelete(pending.card.id);
+      return null;
+    });
+  };
+
+  const handleDeleteCard = (cardId: string) => {
+    if (deleteConfirmation === "confirm") {
+      setConfirmingDeleteId(cardId);
+      return;
+    }
+
+    if (deleteConfirmation === "undo") {
+      // Commit any previous pending delete before starting a new one.
+      flushPendingDelete();
+
+      const index = cards.findIndex((card) => card.id === cardId);
+      const card = cards.find((card) => card.id === cardId);
+      if (!card || index === -1) return;
+
+      // Remove from view immediately, but defer onCardDelete.
+      setCards((prevCards) => prevCards.filter((c) => c.id !== cardId));
+      setPendingDelete({ card, index });
+
+      undoTimerRef.current = setTimeout(() => {
+        undoTimerRef.current = null;
+        if (onCardDelete) onCardDelete(card.id);
+        setPendingDelete(null);
+      }, undoDuration);
+      return;
+    }
+
+    // "immediate" (default) — backwards compatible behavior.
+    commitDelete(cardId);
+  };
+
+  // Restore the card removed in "undo" mode back to its original position.
+  const handleUndoDelete = () => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setPendingDelete((pending) => {
+      if (!pending) return null;
+      setCards((prevCards) => {
+        const copy = [...prevCards];
+        copy.splice(Math.min(pending.index, copy.length), 0, pending.card);
+        return copy;
+      });
+      return null;
+    });
+  };
+
+  // Confirm ("confirm" mode) — actually delete the card.
+  const handleConfirmDelete = (cardId: string) => {
+    setConfirmingDeleteId(null);
+    commitDelete(cardId);
+  };
+
+  // Clear any pending timer on unmount to avoid updates after unmount.
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    };
+  }, []);
 
   const handleEditClick = (cardId: string, currentTitle: string) => {
     setEditingCardId(cardId);
@@ -694,18 +1402,156 @@ const ColumnComponent: React.FC<ColumnProps> = ({
     }
   };
 
+  // Inner content of a single card slot (card or edit box, plus any inline
+  // delete confirmation). Shared by the normal and virtualized list paths.
+  const renderSlotContent = (card: Card) => (
+    <>
+      {editingCardId === card.id ? (
+        <div className="card-edit" data-card-id={card.id}>
+          <input
+            autoFocus
+            type="text"
+            value={newTitle}
+            onChange={handleEditChange}
+            onBlur={() => handleSaveEdit(card.id)}
+            onKeyDown={(e) => handleKeyDown(e, card.id)}
+            aria-label="Edit card title"
+          />
+        </div>
+      ) : (
+        <SortableCard
+          id={card.id}
+          title={card.title}
+          virtualized={shouldVirtualize}
+          selected={enableMultiSelect && selectedIds?.has(card.id)}
+          onSelect={
+            enableMultiSelect && onToggleSelect
+              ? (e) =>
+                  onToggleSelect(
+                    card.id,
+                    e,
+                    filteredCards.map((c) => c.id)
+                  )
+              : undefined
+          }
+        >
+          {(isDragging) =>
+            renderCard ? (
+              renderCard(card, isDragging, expandedCards[card.id], toggleExpand)
+            ) : (
+              <DefaultCard
+                {...card}
+                card={card}
+                cardFields={cardFields}
+                renderAvatar={renderAvatar}
+                isExpanded={expandedCards[card.id]}
+                isDragging={isDragging}
+                toggleExpand={() => toggleExpand(card.id)}
+                onDelete={() => handleDeleteCard(card.id)}
+                onEdit={() => handleEditClick(card.id, card.title)}
+              />
+            )
+          }
+        </SortableCard>
+      )}
+      {confirmingDeleteId === card.id && (
+        <div
+          className="delete-confirm"
+          role="alertdialog"
+          aria-label="Confirm delete"
+          data-testid={`delete-confirm-${card.id}`}
+        >
+          <span className="delete-confirm-text">Delete this card?</span>
+          <div className="delete-confirm-actions">
+            <button
+              type="button"
+              className="delete-confirm-cancel"
+              onClick={() => setConfirmingDeleteId(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="delete-confirm-delete"
+              onClick={() => handleConfirmDelete(card.id)}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  // WIP notice, undo toast and add-card control — shared by both list paths.
+  const columnFooter = (
+    <>
+      {isWipBlocked && (
+        <div
+          className="wip-limit-notification show"
+          role="status"
+          data-testid={`wip-blocked-${column}`}
+        >
+          WIP limit ({limit}) reached!
+        </div>
+      )}
+      {pendingDelete && (
+        <div
+          className="undo-toast"
+          role="status"
+          aria-live="polite"
+          data-testid={`undo-toast-${column}`}
+        >
+          <span className="undo-toast-text">Card deleted</span>
+          <button
+            type="button"
+            className="undo-toast-button"
+            onClick={handleUndoDelete}
+          >
+            Undo
+          </button>
+        </div>
+      )}
+      <div className="add-card-container">
+        {columnForAddCard === column ? (
+          renderAddCard ? (
+            renderAddCard(column, setCards)
+          ) : (
+            <DefaultAddCard
+              column={column}
+              setCards={setCards}
+              onTaskAddedCallback={onTaskAddedCallback}
+            />
+          )
+        ) : null}
+      </div>
+    </>
+  );
+
   return (
     <div
-      className={`kanban-column ${active ? "active" : ""} ${
+      className={`kanban-column ${isOver ? "active" : ""} ${
         isLimitExceeded ? "limit-exceeded" : ""
       }`}
-      onDrop={handleDragEnd}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      ref={columnRef}
       data-testid={`column-${column}`}
     >
       <div className="column-title" style={columnStyle}>
+        {columnDragHandle && (
+          <button
+            type="button"
+            className="column-drag-handle"
+            aria-label={`Reorder column ${title}`}
+            data-testid={`column-grip-${column}`}
+            {...columnDragHandle.attributes}
+            {...columnDragHandle.listeners}
+          >
+            <svg viewBox="0 0 20 20" width="15" height="15" fill="currentColor" aria-hidden="true">
+              <circle cx="7" cy="5" r="1.5" /><circle cx="13" cy="5" r="1.5" />
+              <circle cx="7" cy="10" r="1.5" /><circle cx="13" cy="10" r="1.5" />
+              <circle cx="7" cy="15" r="1.5" /><circle cx="13" cy="15" r="1.5" />
+            </svg>
+          </button>
+        )}
         <div className="column-title-text">{title}</div>
         <div className="column-counter-container">
           <span className={`counter ${isLimitExceeded ? "exceeded" : ""}`}>
@@ -714,73 +1560,209 @@ const ColumnComponent: React.FC<ColumnProps> = ({
           </span>
         </div>
       </div>
-      <div className={`column-content ${active ? "active" : ""}`}>
-        {filteredCards.length === 0 ? (
-          <div className="column-empty-state">{emptyColumnMessage}</div>
-        ) : (
-          <AnimatePresence>
-            {filteredCards.map((card) => (
-              <div className="motion-container" key={card.id}>
-                <DropIndicator beforeId={card.id} column={column} />
-                <motion.div
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  data-card-id={card.id}
-                  className="motion-card-wrapper"
-                >
-                  {editingCardId === card.id ? (
-                    <div className="card-edit">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={newTitle}
-                        onChange={handleEditChange}
-                        onBlur={() => handleSaveEdit(card.id)}
-                        onKeyDown={(e) => handleKeyDown(e, card.id)}
-                        aria-label="Edit card title"
-                      />
-                    </div>
-                  ) : renderCard ? (
-                    renderCard(
-                      card,
-                      handleDragStart,
-                      expandedCards[card.id],
-                      toggleExpand
-                    )
-                  ) : (
-                    <DefaultCard
-                      {...card}
-                      handleDragStart={handleDragStart}
-                      renderAvatar={renderAvatar}
-                      isExpanded={expandedCards[card.id]}
-                      toggleExpand={() => toggleExpand(card.id)}
-                      onDelete={() => handleDeleteCard(card.id)}
-                      onEdit={() => handleEditClick(card.id, card.title)}
-                    />
-                  )}
-                </motion.div>
-              </div>
-            ))}
-          </AnimatePresence>
-        )}
-        <DropIndicator beforeId={-1} column={column} />
-        <div className="add-card-container">
-          {columnForAddCard === column ? (
-            renderAddCard ? (
-              renderAddCard(column, setCards)
-            ) : (
-              <DefaultAddCard
-                column={column}
-                setCards={setCards}
-                onTaskAddedCallback={onTaskAddedCallback}
-              />
-            )
-          ) : null}
+      {shouldVirtualize ? (
+        <SortableContext
+          items={filteredCards.map((c) => c.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <VirtualCardSlots
+            setDroppableRef={setDroppableRef}
+            isOver={isOver}
+            cards={filteredCards}
+            estimatedHeight={virtualItemEstimatedHeight}
+            renderSlotContent={renderSlotContent}
+          />
+          <div className="column-footer">{columnFooter}</div>
+        </SortableContext>
+      ) : (
+        <div
+          ref={setDroppableRef}
+          className={`column-content ${isOver ? "active" : ""}`}
+        >
+          {isColumnLoading ? (
+            <div data-testid={`column-loading-${column}`}>
+              {renderColumnLoading ? (
+                renderColumnLoading(columnData)
+              ) : (
+                <ColumnLoadingState />
+              )}
+            </div>
+          ) : filteredCards.length === 0 ? (
+            <div className="column-empty-state">
+              {emptyMessage ?? emptyColumnMessage}
+            </div>
+          ) : (
+            <SortableContext
+              items={filteredCards.map((c) => c.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {filteredCards.map((card) => (
+                <div className="card-slot" key={card.id}>
+                  {renderSlotContent(card)}
+                </div>
+              ))}
+            </SortableContext>
+          )}
+          {columnFooter}
         </div>
+      )}
+    </div>
+  );
+};
+
+// Windowed card list for very large columns. Only the visible rows are
+// rendered; each is absolutely positioned by the virtualizer. The parent's
+// SortableContext still lists every card id so dnd-kit knows the full order.
+const VirtualCardSlots = ({
+  setDroppableRef,
+  isOver,
+  cards,
+  estimatedHeight,
+  renderSlotContent,
+}: {
+  setDroppableRef: (el: HTMLElement | null) => void;
+  isOver: boolean;
+  cards: Card[];
+  estimatedHeight: number;
+  renderSlotContent: (card: Card) => ReactNode;
+}) => {
+  // Own the scroll element so its ref is set before the virtualizer's effects
+  // run (a child ref is attached during its own commit); also register it as
+  // the column droppable so drops on empty space and auto-scroll work.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const setRefs = (el: HTMLDivElement | null) => {
+    scrollRef.current = el;
+    setDroppableRef(el);
+  };
+
+  const virtualizer = useVirtualizer({
+    count: cards.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => estimatedHeight,
+    overscan: 6,
+  });
+
+  return (
+    <div
+      ref={setRefs}
+      className={`column-content virtualized ${isOver ? "active" : ""}`}
+    >
+      <div
+        style={{
+          height: virtualizer.getTotalSize(),
+          position: "relative",
+          width: "100%",
+        }}
+      >
+        {virtualizer.getVirtualItems().map((vi) => {
+          const card = cards[vi.index];
+          return (
+            <div
+              key={card.id}
+              data-index={vi.index}
+              ref={virtualizer.measureElement}
+              className="card-slot virtual"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${vi.start}px)`,
+              }}
+            >
+              {renderSlotContent(card)}
+            </div>
+          );
+        })}
       </div>
+    </div>
+  );
+};
+
+// Sortable wrapper for a whole column (drag-to-reorder). The column moves via
+// the wrapper's transform; the drag handle (grip) lives in the column header.
+const SortableColumn = ({
+  id,
+  children,
+}: {
+  id: string;
+  children: (handle: {
+    attributes: any;
+    listeners: any;
+  }) => ReactNode;
+}) => {
+  const {
+    setNodeRef,
+    transform,
+    transition,
+    attributes,
+    listeners,
+    isDragging,
+  } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : undefined,
+    height: "fit-content",
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="sortable-column-wrapper">
+      {children({ attributes, listeners })}
+    </div>
+  );
+};
+
+// Sortable wrapper: makes its child card draggable via pointer, touch and
+// keyboard (Space to pick up, arrows to move, Space/Enter to drop, Esc to
+// cancel). The whole card is the drag handle; small movements are ignored so
+// clicks on inner buttons still work.
+const SortableCard = ({
+  id,
+  title,
+  virtualized,
+  selected,
+  onSelect,
+  children,
+}: {
+  id: string;
+  title: string;
+  virtualized?: boolean;
+  selected?: boolean;
+  onSelect?: (e: React.MouseEvent) => void;
+  children: (isDragging: boolean) => ReactNode;
+}) => {
+  const {
+    setNodeRef,
+    attributes,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  // In virtualized columns the row is positioned by the virtualizer, so we skip
+  // dnd-kit's sort transform/transition (which would fight it).
+  const style: React.CSSProperties = virtualized
+    ? { opacity: isDragging ? 0.4 : undefined }
+    : {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : undefined,
+      };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-card-id={id}
+      className={`sortable-card-wrapper ${selected ? "selected" : ""}`}
+      {...attributes}
+      {...listeners}
+      aria-label={title}
+      aria-selected={onSelect ? !!selected : undefined}
+      onClick={onSelect}
+    >
+      {children(isDragging)}
     </div>
   );
 };
@@ -790,58 +1772,40 @@ const DefaultCard = ({
   title,
   avatarPath,
   id,
-  status,
   priority,
   dueDate,
   tags,
   description,
-  handleDragStart,
   renderAvatar,
   isExpanded,
   toggleExpand,
   onDelete,
   onEdit,
+  isDragging,
+  isOverlay,
+  card,
+  cardFields,
 }: DefaultCardProps) => {
+  const schemaFields = (cardFields || []).filter(
+    (f) => card && card[f.key] !== undefined && card[f.key] !== ""
+  );
   const hasDetails =
-    priority || dueDate || description || (tags && tags.length > 0);
+    priority ||
+    dueDate ||
+    description ||
+    (tags && tags.length > 0) ||
+    schemaFields.length > 0;
 
-  // Priority color mapping
-  const priorityColors = {
-    High: "#F87171",
-    Medium: "#FBBF24",
-    Low: "#34D399",
-  };
-
-  // Get border color based on priority
-  const borderColor = priority ? priorityColors[priority] : undefined;
+  // Priority accent is applied via a themeable CSS class (see --kb-priority-*).
+  const priorityClass = priority ? `kb-pri-${priority.toLowerCase()}` : "";
 
   return (
-    <motion.div
-      layout
-      layoutId={id}
-      className={`card ${isExpanded ? "expanded" : ""}`}
-      draggable
-      onDragStart={(e) => handleDragStart(e, { title, id, status })}
-      style={{
-        borderLeft: borderColor ? `4px solid ${borderColor}` : undefined,
-      }}
-      whileHover={{
-        y: -2,
-        boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08)",
-      }}
-      transition={{
-        type: "spring",
-        stiffness: 400,
-        damping: 17,
-      }}
-      tabIndex={0}
+    <div
+      className={`card ${priorityClass} ${isExpanded ? "expanded" : ""} ${
+        isDragging ? "dragging" : ""
+      } ${isOverlay ? "overlay" : ""}`}
       role="article"
       aria-label={`Card: ${title}`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          if (toggleExpand) toggleExpand(id);
-        }
-      }}
     >
       <div className="card-header">
         <h3 className="card-title">
@@ -912,6 +1876,23 @@ const DefaultCard = ({
               ))}
             </div>
           )}
+
+          {schemaFields.map((f) => {
+            const value = card ? card[f.key] : undefined;
+            return (
+              <div className="card-detail" key={f.key} data-field={f.key}>
+                <span className="detail-label">{f.label}:</span>
+                <span className="detail-value">
+                  {f.type === "tags" && Array.isArray(value)
+                    ? value.join(", ")
+                    : f.type === "select"
+                    ? f.options?.find((o) => o.value === value)?.label ??
+                      String(value)
+                    : String(value)}
+                </span>
+              </div>
+            );
+          })}
         </motion.div>
       )}
 
@@ -931,7 +1912,7 @@ const DefaultCard = ({
           </button>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -1022,23 +2003,6 @@ const DefaultAddCard = ({
     >
       <span>+</span> Add Card
     </motion.div>
-  );
-};
-
-const DropIndicator = ({
-  beforeId,
-  column,
-}: {
-  beforeId: string | number;
-  column: string;
-}) => {
-  return (
-    <div
-      data-before={beforeId}
-      data-column={column}
-      className="drop-indicator"
-      aria-hidden="true"
-    />
   );
 };
 

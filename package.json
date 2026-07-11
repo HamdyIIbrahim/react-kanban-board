@@ -1,31 +1,43 @@
 {
   "name": "react-custom-kanban-board",
-  "version": "2.0.0",
-  "description": "A customizable Kanban board component for React with advanced features like search, filtering, and WIP limits.",
+  "version": "3.0.0",
+  "description": "A customizable Kanban board component for React with touch + keyboard accessible drag-and-drop, controlled/uncontrolled state, search, filtering, and WIP limits.",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "sideEffects": false,
   "scripts": {
+    "dev": "vite",
     "clean": "rimraf dist",
     "build": "npm run clean && tsc && npm run build:css",
     "build:css": "postcss src/KanbanBoard.css -o dist/KanbanBoard.css",
+    "docs": "node scripts/generate-api-docs.cjs",
+    "docs:check": "node scripts/generate-api-docs.cjs --check",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@tanstack/react-virtual": "^3.14.5",
     "framer-motion": "^11.3.30",
     "react": "^16.* || ^17.* || ^18.* || ^19.*",
     "react-dom": "^16.* || ^17.* || ^18.* || ^19.*"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/react": "^16.* || ^17.* || ^18.* || ^19.*",
     "@types/react-dom": "^16.* || ^17.* || ^18.* || ^19.*",
+    "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.21",
     "postcss-cli": "^10.1.0",
     "rimraf": "^5.0.0",
-    "typescript": "^4.9.0 || ^5.0.0"
+    "typescript": "^4.9.0 || ^5.0.0",
+    "vite": "^8.1.4"
   },
   "peerDependencies": {
     "react": "^16.* || ^17.* || ^18.* || ^19.*",
@@ -38,7 +50,8 @@
   },
   "files": [
     "dist/**/*",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "kanban-board",

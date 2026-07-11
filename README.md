@@ -11,7 +11,7 @@ Here are some visual examples of the Kanban board component:
 
 ## Features
 
-- **Drag and Drop Functionality:** Move task cards between columns with ease
+- **Drag and Drop Functionality:** Move task cards between columns with mouse, touch, or keyboard (powered by [dnd-kit](https://dndkit.com/))
 - **Customizable Card Rendering:** Tailor the appearance of task cards to fit your design
 - **Add, Edit, and Delete Tasks:** Manage tasks directly from the Kanban board
 - **Support for Avatars:** Display avatars on task cards for better team representation
@@ -22,8 +22,8 @@ Here are some visual examples of the Kanban board component:
 - **Dynamic Filtering:** Filter cards by various properties (priority, assignee, status)
 - **Search Functionality:** Search for cards by title
 - **UI Library Integration:** Seamlessly integrate with popular UI libraries like Chakra UI
-- **Responsive Design:** Works on desktop and mobile devices
-- **Accessibility Features:** Built with accessibility in mind
+- **Responsive Design:** Works on desktop and mobile devices — touch dragging with press-and-hold
+- **Keyboard Accessible Drag-and-Drop:** Focus a card, press <kbd>Space</kbd> to pick it up, arrow keys to move (including across columns), <kbd>Space</kbd>/<kbd>Enter</kbd> to drop, <kbd>Esc</kbd> to cancel — with screen-reader announcements
 
 ## Installation
 
@@ -300,25 +300,314 @@ const App = () => {
 export default App;
 ```
 
+## Realtime collaboration
+
+Because the board is fully controllable (`cards` + `onCardsChange`), wiring it to
+a websocket or a Convex-style live query is just: broadcast local changes and
+set `cards` from remote state. `diffCards` turns two card lists into a minimal
+patch so you can send changes (not the whole board) over the wire:
+
+```jsx
+import { diffCards, ControlledKanbanBoard } from "react-custom-kanban-board";
+
+const channel = new BroadcastChannel("board"); // or a websocket
+
+<ControlledKanbanBoard
+  cards={cards}
+  onCardsChange={(next) => {
+    const patch = diffCards(cards, next); // [{type:'move', id, from, to}, ...]
+    channel.postMessage(patch); // send only what changed
+    setCards(next);
+  }}
+  columns={columns}
+  columnForAddCard="todo"
+/>;
+
+// Apply remote updates by setting `cards` — the board just re-renders.
+channel.onmessage = (e) => setCards(applyPatch(cards, e.data));
+```
+
+Each `CardChange` is `add` / `remove` / `move` / `update`. The demo's **Realtime
+sync** toggle syncs two browser tabs live via `BroadcastChannel`.
+
+## Activity log
+
+`useActivityLog` builds a lightweight per-card audit trail from the board's
+callbacks (moved / renamed / deleted):
+
+```jsx
+import { useActivityLog } from "react-custom-kanban-board";
+
+const log = useActivityLog({ actor: "you", limit: 50 });
+
+<KanbanBoard
+  columns={columns}
+  initialCards={cards}
+  columnForAddCard="todo"
+  onCardMove={log.onCardMove}
+  onCardEdit={log.onCardEdit}
+  onCardDelete={log.onCardDelete}
+/>;
+
+{log.entries.map((e) => (
+  <li key={e.id}>
+    {e.cardId} {e.detail} {e.actor && `· by ${e.actor}`}
+  </li>
+))}
+```
+
+Each entry has `{ id, type, cardId, timestamp, detail, actor }`. Use
+`log.record(type, cardId, detail)` to append custom entries and `log.clear()`
+to reset.
+
+## Custom card fields (typed schema)
+
+Beyond the built-in `priority` / `dueDate` / `tags` / `assignee`, describe your
+own fields with a typed schema. They render in the default card's expanded
+details and can be validated with `validateCard`.
+
+```jsx
+import { validateCard } from "react-custom-kanban-board";
+
+const cardFields = [
+  { key: "storyPoints", label: "Story points", type: "number" },
+  {
+    key: "epic",
+    label: "Epic",
+    type: "select",
+    options: [
+      { value: "auth", label: "Authentication" },
+      { value: "infra", label: "Infrastructure" },
+    ],
+    required: true,
+  },
+];
+
+<KanbanBoard columns={columns} initialCards={cards} columnForAddCard="todo" cardFields={cardFields} />;
+
+// Validate before saving:
+const errors = validateCard(card, cardFields); // string[] (empty = valid)
+```
+
+For full type-safety, extend `Card` with your fields:
+`interface MyCard extends Card { storyPoints: number; epic: string }`.
+
+## Backend persistence (optimistic + rollback)
+
+The `usePersistentBoard` hook wires a controlled board to a backend: mutations
+apply instantly (optimistic), and if a backend call rejects, the board rolls
+back to the previous state and calls `onError`.
+
+```jsx
+import { usePersistentBoard, ControlledKanbanBoard } from "react-custom-kanban-board";
+
+function Board() {
+  const board = usePersistentBoard(initialCards, {
+    onCardMove: (id, status, pos) => api.moveCard(id, status, pos),
+    onCardEdit: (id, title) => api.renameCard(id, title),
+    onCardDelete: (id) => api.deleteCard(id),
+    onError: () => toast("Couldn't save — reverted"),
+  });
+
+  return (
+    <ControlledKanbanBoard
+      columns={columns}
+      columnForAddCard="todo"
+      cards={board.cards}
+      onCardsChange={board.onCardsChange}
+      onCardMove={board.onCardMove}
+      onCardEdit={board.onCardEdit}
+      onCardDelete={board.onCardDelete}
+    />
+  );
+}
+```
+
+`board.isSyncing` is `true` while a backend call is in flight. Each adapter
+method returns a `Promise`; a rejection triggers the rollback.
+
+## Export / import
+
+Pure helpers to snapshot or migrate a board's cards as JSON or CSV (no React
+dependency — usable on the server too):
+
+```jsx
+import {
+  exportCardsToJSON,
+  exportCardsToCSV,
+  importCardsFromJSON,
+  importCardsFromCSV,
+} from "react-custom-kanban-board";
+
+const json = exportCardsToJSON(cards); // pretty-printed JSON
+const csv = exportCardsToCSV(cards); // array fields (tags) joined with "|"
+
+const cards1 = importCardsFromJSON(json); // validates id/title/status
+const cards2 = importCardsFromCSV(csv); // parses quoted fields correctly
+```
+
+Invalid input throws a descriptive `Error`. CSV export includes the core card
+fields plus any extra scalar fields; CSV values import back as strings.
+
+## Theming
+
+The board is styled entirely through `--kb-*` CSS variables (design tokens), so
+you can reskin it without fighting selector specificity. Override them globally
+on `:root`, or scope them to one board via the `className` / `style` props.
+
+A ready-made dark theme ships as `.kb-dark`:
+
+```jsx
+<KanbanBoard className="kb-dark" columns={columns} initialCards={cards} columnForAddCard="todo" />
+```
+
+Or set your own tokens inline / in a scoped class:
+
+```jsx
+<KanbanBoard
+  columns={columns}
+  initialCards={cards}
+  columnForAddCard="todo"
+  style={{
+    ["--kb-accent"]: "#7c3aed",
+    ["--kb-card-radius"]: "16px",
+    ["--kb-priority-high"]: "#e11d48",
+  }}
+/>
+```
+
+Key tokens (see `src/KanbanBoard.css` for the full set):
+
+| Token | Purpose |
+| --- | --- |
+| `--kb-board-bg` / `--kb-column-bg` / `--kb-card-bg` | Surfaces |
+| `--kb-text` / `--kb-text-muted` | Text |
+| `--kb-accent` / `--kb-hover-bg` | Accent & interaction |
+| `--kb-border` / `--kb-radius` / `--kb-card-radius` | Lines & radii |
+| `--kb-shadow` / `--kb-shadow-hover` | Elevation |
+| `--kb-priority-high` / `--kb-priority-medium` / `--kb-priority-low` | Priority accents |
+| `--kb-font` | Font family |
+
+> Previous variable names (`--card-bg`, `--accent-color`, …) still work as
+> aliases, so existing overrides keep functioning.
+
+## Virtualization (experimental)
+
+For boards with very large columns (hundreds of cards), set
+`virtualizeColumnsOver` to window each column's list so only the visible cards
+are rendered. It's **off by default** and fully non-breaking.
+
+```jsx
+<KanbanBoard
+  columns={columns}
+  initialCards={cards}
+  columnForAddCard="todo"
+  virtualizeColumnsOver={50} // window any column with > 50 cards
+  virtualItemEstimatedHeight={120}
+/>
+```
+
+In testing, a 300-card column dropped from ~6,200 DOM nodes to ~350 (only ~13
+cards rendered). Drag-and-drop (mouse, touch, keyboard) keeps working for
+visible cards, and the `onCardMove` / `DropPosition` contract is unchanged.
+
+> **⚠️ Caveats (why it's experimental):**
+>
+> - **No auto-scroll to off-screen targets while dragging.** You can reorder
+>   among the cards currently in view, but you can't drag a card to a position
+>   that's scrolled out of view in one motion — scroll to the target area first,
+>   then drag. (Auto-scroll-during-drag for windowed columns is planned.)
+> - No live "make room" shift animation inside virtualized columns.
+> - Best for read-heavy large boards; if you need long-distance drags across a
+>   huge column, leave virtualization off for that board.
+
+## Controlled vs. uncontrolled
+
+The board works in two modes:
+
+**Uncontrolled (default)** — pass `initialCards` and let the board own its state.
+It seeds once on mount; use the callbacks (`onCardMove`, `onCardEdit`,
+`onCardDelete`, `onCardsChange`) to observe changes.
+
+```jsx
+<KanbanBoard columns={columns} initialCards={initialCards} columnForAddCard="todo" />
+```
+
+**Controlled** — pass `cards` and `onCardsChange`. The board renders `cards`
+directly and never mutates internal state, so it stays perfectly in sync with a
+backend or external store. Every change hands you the full next list.
+
+```jsx
+import { ControlledKanbanBoard } from "react-custom-kanban-board";
+
+const [cards, setCards] = useState(initialCards);
+
+<ControlledKanbanBoard
+  columns={columns}
+  columnForAddCard="todo"
+  cards={cards}
+  onCardsChange={setCards} // persist to your backend here too
+/>;
+```
+
+`ControlledKanbanBoard` is a thin, type-safe wrapper that makes `cards` and
+`onCardsChange` required. You can also just pass `cards` + `onCardsChange` to the
+regular `KanbanBoard`.
+
+> **⚠️ Migration (v2 → v3):**
+>
+> - **State:** In v2, changing `initialCards` after mount reset the board. As of
+>   v3, `initialCards` is **uncontrolled** and seeds state only once — later
+>   changes are ignored. If you were updating `initialCards` from a backend,
+>   switch to controlled mode (`cards` + `onCardsChange`).
+> - **Drag-and-drop:** v3 replaces native HTML5 drag-and-drop with
+>   [dnd-kit](https://dndkit.com/) for touch and keyboard support. The board now
+>   requires `@dnd-kit/core`, `@dnd-kit/sortable`, and `@dnd-kit/utilities`
+>   (installed automatically as dependencies).
+> - **`renderCard`:** the second argument changed from `handleDragStart` to
+>   `isDragging: boolean`. Custom cards no longer need to wire drag events — the
+>   whole card is a drag handle. Remove any `draggable`/`onDragStart` you added.
+
 ## Props
+
+> **📖 Authoritative API reference:** [`docs/API.md`](./docs/API.md) is generated
+> directly from the TypeScript source (`npm run docs`) and never drifts from the
+> actual types. The tables below are a hand-maintained summary; when in doubt,
+> trust the generated reference.
 
 ### KanbanBoard Component Props
 
 | Prop                  | Type                                                                                                                                                              | Default          | Description                                                                                                           |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `columns`             | `Column[]`                                                                                                                                                        | `[]`             | Array of columns to display. Each object should include `title`, `key`, and `color`.                                  |
-| `initialCards`        | `Card[]`                                                                                                                                                          | `[]`             | Array of cards to display initially. Each object should include `id`, `title`, `status`, and optionally `avatarPath`. |
+| `initialCards`        | `Card[]`                                                                                                                                                          | `[]`             | **Uncontrolled mode.** Seeds the board's internal card state once, on mount. Later changes to this prop are ignored (see [Controlled vs. uncontrolled](#controlled-vs-uncontrolled)). |
+| `cards`               | `Card[]`                                                                                                                                                          | -                | **Controlled mode.** When provided, the board renders these cards directly and never mutates internal state. Pair with `onCardsChange`. |
+| `onCardsChange`       | `(cards: Card[]) => void`                                                                                                                                         | -                | Called with the full next card list on every mutation (move, edit, delete, add). Required for controlled mode; also fires in uncontrolled mode. |
+| `className`           | `string`                                                                                                                                                          | -                | Applied to the board root — use it to scope a theme (e.g. `"kb-dark"`). See [Theming](#theming). |
+| `style`               | `React.CSSProperties`                                                                                                                                             | -                | Applied to the board root — handy for setting `--kb-*` tokens inline.                                |
 | `columnForAddCard`    | `string`                                                                                                                                                          | -                | Key of the column where new cards will be added.                                                                      |
-| `onCardMove`          | `(cardId: string, newStatus: string) => void`                                                                                                                     | -                | Callback function when a card is moved.                                                                               |
+| `onCardMove`          | `(cardId: string, newStatus: string, position: DropPosition) => void`                                                                                             | -                | Callback when a card is moved. Fires for both cross-column moves **and** same-column reordering. `position` exposes where the card landed within the destination column. |
 | `onCardEdit`          | `(cardId: string, newTitle: string) => void`                                                                                                                      | -                | Callback function when a card is edited.                                                                              |
 | `onCardDelete`        | `(cardId: string) => void`                                                                                                                                        | -                | Callback function when a card is deleted.                                                                             |
 | `onTaskAddedCallback` | `(title: string) => void`                                                                                                                                         | -                | Callback function when a new task is added.                                                                           |
-| `renderCard`          | `(card: Card, handleDragStart: (e: React.DragEvent<HTMLDivElement>, card: Card) => void, isExpanded?: boolean, toggleExpand?: (id: string) => void) => ReactNode` | -                | Custom function to render cards.                                                                                      |
+| `renderCard`          | `(card: Card, isDragging?: boolean, isExpanded?: boolean, toggleExpand?: (id: string) => void) => ReactNode`                                                       | -                | Custom function to render cards. The card is wrapped in a drag handle automatically — you no longer wire up drag events yourself. `isDragging` is `true` for the card being dragged. |
 | `renderAvatar`        | `(avatarPath?: string) => ReactNode`                                                                                                                              | -                | Custom function to render avatars.                                                                                    |
 | `renderAddCard`       | `(column: string, setCards: React.Dispatch<React.SetStateAction<Card[]>>) => ReactNode`                                                                           | -                | Custom function to render the add card button.                                                                        |
 | `isLoading`           | `boolean`                                                                                                                                                         | `false`          | Shows loading spinner when true.                                                                                      |
 | `loadingComponent`    | `ReactNode`                                                                                                                                                       | -                | Custom loading component.                                                                                             |
-| `emptyColumnMessage`  | `string`                                                                                                                                                          | `"No cards yet"` | Message to display when a column is empty.                                                                            |
+| `emptyColumnMessage`  | `string`                                                                                                                                                          | `"No cards yet"` | Default message shown when a column is empty (a column's `emptyMessage` overrides this).                              |
+| `renderColumnLoading` | `(column: Column) => ReactNode`                                                                                                                                   | -                | Custom per-column loading UI, shown for any column with `isLoading: true`. Falls back to a built-in skeleton.         |
+| `enableColumnReorder` | `boolean`                                                                                                                                                         | `false`          | Enable drag-to-reorder of columns via a grip in each column header (mouse, touch, keyboard).                          |
+| `onColumnsReorder`    | `(orderedKeys: string[]) => void`                                                                                                                                 | -                | Called with the new ordered column keys after a column is reordered.                                                  |
+| `swimlaneBy`          | `string`                                                                                                                                                          | -                | Group cards into horizontal swimlanes by a card field (e.g. `"assignee"`). Dragging a card to another lane updates that field. |
+| `swimlanes`           | `{ value: string; label: string }[]`                                                                                                                              | -                | Explicit swimlanes (value + label + order). Derived from card values when omitted.                                   |
+| `enableMultiSelect`   | `boolean`                                                                                                                                                         | `false`          | Enable multi-select (Cmd/Ctrl-click to toggle, Shift-click for a range) with a bulk action bar (move / delete).       |
+| `onBulkMove`          | `(cardIds: string[], newStatus: string) => void`                                                                                                                  | -                | Called when selected cards are moved to a column in bulk.                                                             |
+| `onBulkDelete`        | `(cardIds: string[]) => void`                                                                                                                                     | -                | Called when selected cards are deleted in bulk.                                                                       |
+| `deleteConfirmation`  | `"immediate" \| "confirm" \| "undo"`                                                                                                                              | `"immediate"`    | Guards card deletion before `onCardDelete` fires. `confirm` shows an inline prompt; `undo` removes the card and shows a brief undo toast, deferring `onCardDelete`. |
+| `virtualizeColumnsOver` | `number`                                                                                                                                                        | -                | **Experimental.** Virtualize (window) a column's list once it exceeds this many cards, for large-board performance. See [Virtualization](#virtualization-experimental) for caveats. |
+| `virtualItemEstimatedHeight` | `number`                                                                                                                                                   | `120`            | Estimated card height (px) used by the virtualizer.                                                                  |
+| `undoDuration`        | `number`                                                                                                                                                          | `5000`           | How long (ms) the undo toast stays before the delete is committed (only used with `deleteConfirmation="undo"`).       |
 | `enableSearch`        | `boolean`                                                                                                                                                         | `false`          | Enable search functionality.                                                                                          |
 | `enableFiltering`     | `boolean`                                                                                                                                                         | `false`          | Enable filtering functionality.                                                                                       |
 | `filterConfigs`       | `FilterConfig[]`                                                                                                                                                  | `[]`             | Configuration for filters.                                                                                            |
@@ -330,10 +619,12 @@ export default App;
 
 | Property | Type     | Description                        |
 | -------- | -------- | ---------------------------------- |
-| `title`  | `string` | Title of the column.               |
-| `key`    | `string` | Unique key for the column.         |
-| `color`  | `string` | Background color for the column.   |
-| `limit`  | `number` | Optional WIP limit for the column. |
+| `title`        | `string`  | Title of the column.                                                        |
+| `key`          | `string`  | Unique key for the column.                                                  |
+| `color`        | `string`  | Background color for the column.                                            |
+| `limit`        | `number`  | Optional WIP limit for the column.                                         |
+| `isLoading`    | `boolean` | Optional per-column loading state (e.g. lazy-loaded data). Shows a skeleton or `renderColumnLoading`. |
+| `emptyMessage` | `string`  | Optional per-column empty message; overrides the board's `emptyColumnMessage`. |
 
 ### Card Interface
 
@@ -350,6 +641,28 @@ export default App;
 | `assignee`      | `string`   | Person assigned to the card.                    |
 | `[key: string]` | `any`      | Any additional custom properties you need.      |
 
+### DropPosition Interface
+
+Passed as the third argument to `onCardMove`, describing where the card landed within its destination column. This makes it easy to persist ordering on a backend (e.g. by storing the previous/next task ids).
+
+| Property     | Type             | Description                                                                            |
+| ------------ | ---------------- | -------------------------------------------------------------------------------------- |
+| `prevTaskId` | `string \| null` | Id of the card immediately **before** the dropped card, or `null` if dropped at the top.    |
+| `nextTaskId` | `string \| null` | Id of the card immediately **after** the dropped card, or `null` if dropped at the bottom.  |
+| `index`      | `number`         | Zero-based index of the dropped card within the destination column.                    |
+
+```jsx
+<KanbanBoard
+  columns={columns}
+  initialCards={cards}
+  columnForAddCard="todo"
+  onCardMove={(cardId, newStatus, { prevTaskId, nextTaskId, index }) => {
+    // Persist the new ordering on your backend
+    api.reorderTask({ cardId, column: newStatus, prevTaskId, nextTaskId, index });
+  }}
+/>
+```
+
 ### FilterConfig Interface
 
 | Property  | Type             | Description                                        |
@@ -364,6 +677,20 @@ export default App;
 | -------- | -------- | ------------------------------------ |
 | `value`  | `string` | Value of the filter option.          |
 | `label`  | `string` | Display label for the filter option. |
+
+## Development
+
+```bash
+npm install        # install deps
+npm run dev        # preview the component (demo/) at http://localhost:5173
+npm run build      # compile the library to dist/
+npm run docs       # regenerate docs/API.md from the TypeScript source
+npm test           # run the Playwright end-to-end suite (drives the demo)
+```
+
+The end-to-end tests in `test/` drive the demo app (which renders the library
+straight from `src/`), so they exercise real drag-and-drop, delete, loading, and
+controlled/uncontrolled behavior in a browser.
 
 ## Contributing
 

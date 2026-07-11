@@ -1,14 +1,80 @@
+/* =========================================================================
+   Design tokens — override any --kb-* variable (globally on :root, or scoped
+   to a wrapper via the board's `className` / `style` props) to reskin the
+   board without fighting selector specificity. A ready-made dark theme ships
+   as `.kb-dark` (pass className="kb-dark").
+   ========================================================================= */
 :root {
-  --board-bg: #f5f6f8;
-  --column-bg: #f8f9fa;
-  --card-bg: #ffffff;
-  --text-color: #1a1a1a;
-  --accent-color: #228be6;
-  --border-radius: 12px;
-  --shadow-color: rgba(0, 0, 0, 0.1);
-  --border-color: rgba(0, 0, 0, 0.05);
-  --muted-text: #666;
-  --hover-bg: rgba(34, 139, 230, 0.1);
+  /* Surfaces */
+  --kb-board-bg: #f5f6f8;
+  --kb-column-bg: #f8f9fa;
+  --kb-card-bg: #ffffff;
+  --kb-elevated-bg: #ffffff;
+
+  /* Text */
+  --kb-text: #1a1a1a;
+  --kb-text-muted: #667085;
+
+  /* Accent + interaction */
+  --kb-accent: #228be6;
+  --kb-hover-bg: rgba(34, 139, 230, 0.1);
+
+  /* Lines, radii, shadows */
+  --kb-border: rgba(0, 0, 0, 0.06);
+  --kb-radius: 12px;
+  --kb-radius-sm: 8px;
+  --kb-card-radius: 12px;
+  --kb-shadow-color: rgba(0, 0, 0, 0.1);
+  --kb-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --kb-shadow-hover: 0 10px 24px -12px rgba(16, 24, 40, 0.28);
+
+  /* Priority accents */
+  --kb-priority-high: #ef4444;
+  --kb-priority-medium: #f59e0b;
+  --kb-priority-low: #10b981;
+
+  /* Typography */
+  --kb-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* --- Back-compat aliases (previous variable names still work) --- */
+  --board-bg: var(--kb-board-bg);
+  --column-bg: var(--kb-column-bg);
+  --card-bg: var(--kb-card-bg);
+  --text-color: var(--kb-text);
+  --accent-color: var(--kb-accent);
+  --border-radius: var(--kb-radius);
+  --shadow-color: var(--kb-shadow-color);
+  --border-color: var(--kb-border);
+  --muted-text: var(--kb-text-muted);
+  --hover-bg: var(--kb-hover-bg);
+}
+
+/* Ready-made dark theme: <KanbanBoard className="kb-dark" /> */
+.kb-dark {
+  --kb-board-bg: #0f1115;
+  --kb-column-bg: #161922;
+  --kb-card-bg: #1b1f2a;
+  --kb-elevated-bg: #222635;
+  --kb-text: #e7e9ee;
+  --kb-text-muted: #9aa0ad;
+  --kb-accent: #6ea8fe;
+  --kb-hover-bg: rgba(110, 168, 254, 0.16);
+  --kb-border: rgba(255, 255, 255, 0.09);
+  --kb-shadow-color: rgba(0, 0, 0, 0.5);
+  --kb-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --kb-shadow-hover: 0 12px 28px -12px rgba(0, 0, 0, 0.6);
+
+  /* Re-resolve the back-compat aliases against the dark tokens (they'd
+     otherwise stay light, having been substituted on :root). */
+  --board-bg: var(--kb-board-bg);
+  --column-bg: var(--kb-column-bg);
+  --card-bg: var(--kb-card-bg);
+  --text-color: var(--kb-text);
+  --accent-color: var(--kb-accent);
+  --shadow-color: var(--kb-shadow-color);
+  --border-color: var(--kb-border);
+  --muted-text: var(--kb-text-muted);
+  --hover-bg: var(--kb-hover-bg);
 }
 
 .kanban-board-container {
@@ -34,7 +100,7 @@
 
 .kanban-search {
   padding: 1rem;
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: var(--kb-column-bg);
   backdrop-filter: blur(5px);
   border-radius: var(--border-radius) var(--border-radius) 0 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
@@ -197,14 +263,83 @@
   max-width: 75%;
 }
 
+/* Swimlanes */
+.kanban-swimlanes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0.5rem 0 2rem;
+}
+.swimlane {
+  border-radius: var(--kb-radius);
+}
+.swimlane-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 6px;
+  position: sticky;
+  left: 0;
+}
+.swimlane-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--kb-text);
+  text-transform: capitalize;
+}
+.swimlane-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--kb-text-muted);
+  background: var(--kb-elevated-bg);
+  border: 1px solid var(--kb-border);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+.swimlane .kanban-board {
+  min-height: auto;
+  padding-top: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+.swimlane .kanban-column {
+  max-height: none;
+}
+
+/* Column drag-to-reorder grip */
+.sortable-column-wrapper {
+  display: flex;
+}
+.column-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.5;
+  cursor: grab;
+  padding: 2px;
+  margin-right: 6px;
+  border-radius: 6px;
+  touch-action: none;
+  transition: opacity 0.15s, background 0.15s;
+}
+.column-drag-handle:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}
+.column-drag-handle:active {
+  cursor: grabbing;
+}
+
 .column-counter-container {
   display: flex;
   align-items: center;
 }
 
 .counter {
-  background: white;
-  color: #333;
+  background: var(--kb-elevated-bg);
+  color: var(--kb-text);
   border-radius: 24px;
   padding: 0.3em 0.8em;
   font-weight: 700;
@@ -279,18 +414,36 @@
 }
 
 .card {
-  background: var(--card-bg);
-  border-radius: 10px;
-  padding: 1.25rem;
-  box-shadow: 0 2px 5px var(--shadow-color);
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  transition: all 0.2s ease;
+  background: var(--kb-card-bg);
+  border-radius: var(--kb-card-radius);
+  padding: 1.1rem 1.15rem;
+  box-shadow: var(--kb-shadow);
+  border: 1px solid var(--kb-border);
+  color: var(--kb-text);
+  transition: box-shadow 0.18s ease, transform 0.18s ease,
+    border-color 0.18s ease;
   cursor: grab;
   max-width: 100%;
   width: 100%;
   overflow: hidden;
   box-sizing: border-box;
+  font-family: var(--kb-font);
+}
+
+.sortable-card-wrapper:hover .card {
+  box-shadow: var(--kb-shadow-hover);
+  transform: translateY(-1px);
+}
+
+/* Themeable priority accent (left border) */
+.card.kb-pri-high {
+  border-left: 3px solid var(--kb-priority-high);
+}
+.card.kb-pri-medium {
+  border-left: 3px solid var(--kb-priority-medium);
+}
+.card.kb-pri-low {
+  border-left: 3px solid var(--kb-priority-low);
 }
 
 /* Card Header */
@@ -820,34 +973,34 @@
 }
 
 /* Fix WIP limit notification visibility in dark mode */
-[data-theme="dark"] .wip-limit-notification {
+.kb-dark .wip-limit-notification {
   background-color: #ef5350;
 }
 
 /* Ensure priority badges have good contrast in all themes */
-[data-theme="dark"] .priority-badge.high {
+.kb-dark .priority-badge.high {
   background-color: rgba(239, 68, 68, 0.2);
   color: #f87171;
 }
 
-[data-theme="dark"] .priority-badge.medium {
+.kb-dark .priority-badge.medium {
   background-color: rgba(245, 158, 11, 0.2);
   color: #fbbf24;
 }
 
-[data-theme="dark"] .priority-badge.low {
+.kb-dark .priority-badge.low {
   background-color: rgba(16, 185, 129, 0.2);
   color: #34d399;
 }
 
 /* Fix counter styling in dark mode */
-[data-theme="dark"] .counter {
+.kb-dark .counter {
   background: #334155;
   color: #f1f5f9;
 }
 
 /* Fix empty state styling in dark mode */
-[data-theme="dark"] .column-empty-state {
+.kb-dark .column-empty-state {
   color: var(--muted-text);
   border-color: var(--border-color);
   background-color: rgba(255, 255, 255, 0.03);
@@ -935,69 +1088,311 @@
 }
 
 /* Better dark mode theme support */
-[data-theme="dark"] {
+.kb-dark {
   --border-color: rgba(255, 255, 255, 0.1);
   --shadow-color: rgba(0, 0, 0, 0.4);
   --muted-text: #94a3b8;
 }
 
-[data-theme="dark"] .kanban-search {
+.kb-dark .kanban-search {
   background-color: rgba(30, 41, 59, 0.8);
   backdrop-filter: blur(5px);
   border-color: var(--border-color);
 }
 
-[data-theme="dark"] .add-card {
+.kb-dark .add-card {
   background-color: rgba(255, 255, 255, 0.03);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-[data-theme="dark"] .add-card:hover {
+.kb-dark .add-card:hover {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-[data-theme="dark"] .add-card-form {
+.kb-dark .add-card-form {
   background-color: var(--card-bg);
   border-color: var(--border-color);
 }
 
-[data-theme="dark"] .add-card-input {
+.kb-dark .add-card-input {
   background-color: rgba(0, 0, 0, 0.2);
   color: var(--text-color);
   border-color: var(--border-color);
 }
 
-[data-theme="dark"] .add-card-buttons button:first-child {
+.kb-dark .add-card-buttons button:first-child {
   background-color: var(--accent-color);
 }
 
-[data-theme="dark"] .add-card-buttons button:last-child {
+.kb-dark .add-card-buttons button:last-child {
   background-color: rgba(255, 255, 255, 0.1);
   color: var(--text-color);
 }
 
 /* Fix empty state styling in dark mode */
-[data-theme="dark"] .column-empty-state {
+.kb-dark .column-empty-state {
   color: var(--muted-text);
   border-color: var(--border-color);
   background-color: rgba(255, 255, 255, 0.03);
 }
 
 /* Fix card-edit for dark themes */
-[data-theme="dark"] .card-edit {
+.kb-dark .card-edit {
   background-color: var(--card-bg);
 }
 
-[data-theme="dark"] .card-edit input {
+.kb-dark .card-edit input {
   background-color: rgba(0, 0, 0, 0.2);
   color: var(--text-color);
   border-color: var(--border-color);
 }
 
 /* Fix drag preview for dark mode */
-[data-theme="dark"] .card-drag-preview {
+.kb-dark .card-drag-preview {
   background-color: var(--card-bg);
   color: var(--text-color);
   border-color: var(--accent-color);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* dnd-kit sortable card wrapper (drag handle = whole card) */
+.sortable-card-wrapper {
+  outline: none;
+  touch-action: manipulation;
+  cursor: grab;
+}
+
+.sortable-card-wrapper:focus-visible .card {
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+.card.dragging {
+  cursor: grabbing;
+}
+
+/* Multi-select */
+.sortable-card-wrapper.selected .card,
+.sortable-card-wrapper.selected > * {
+  box-shadow: 0 0 0 2px var(--kb-accent), var(--kb-shadow);
+}
+.sortable-card-wrapper.selected {
+  position: relative;
+}
+
+.bulk-action-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 20;
+  margin: 4px auto 0;
+  width: fit-content;
+  max-width: 96%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--kb-text);
+  color: var(--kb-card-bg);
+  border-radius: 999px;
+  box-shadow: var(--kb-shadow-hover);
+  font-family: var(--kb-font);
+}
+.bulk-count {
+  font-weight: 700;
+  font-size: 13px;
+  padding-right: 4px;
+}
+.bulk-move-label {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.bulk-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bulk-btn:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.bulk-btn.danger {
+  background: var(--kb-priority-high);
+  color: #fff;
+}
+.bulk-btn.ghost {
+  background: transparent;
+  opacity: 0.75;
+}
+
+/* Drag overlay preview follows the pointer/keyboard focus */
+.card-drag-overlay {
+  cursor: grabbing;
+}
+
+.card-drag-overlay .card,
+.card.overlay {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  transform: rotate(2deg);
+}
+
+.card-slot {
+  position: relative;
+}
+
+/* Virtualized column: the content area becomes the scroll container */
+.column-content.virtualized {
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+.card-slot.virtual {
+  padding: 0 2px;
+}
+
+/* Per-column loading skeleton */
+.column-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.column-skeleton-card {
+  height: 64px;
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 25%,
+    rgba(0, 0, 0, 0.12) 37%,
+    rgba(0, 0, 0, 0.06) 63%
+  );
+  background-size: 400% 100%;
+  animation: column-skeleton-shimmer 1.4s ease infinite;
+}
+
+.column-skeleton-card:nth-child(2) {
+  height: 88px;
+}
+
+@keyframes column-skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.kb-dark .column-skeleton-card {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.12) 37%,
+    rgba(255, 255, 255, 0.06) 63%
+  );
+  background-size: 400% 100%;
+}
+
+/* Inline delete confirmation ("confirm" mode) */
+.delete-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -4px 0 8px;
+  padding: 8px 10px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid #ef4444;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow-color);
+  font-size: 13px;
+  color: var(--text-color);
+}
+
+.delete-confirm-text {
+  font-weight: 500;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.delete-confirm button {
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.delete-confirm button:hover {
+  opacity: 0.85;
+}
+
+.delete-confirm-cancel {
+  background-color: var(--hover-bg);
+  color: var(--text-color);
+}
+
+.delete-confirm-delete {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+/* Undo toast ("undo" mode) */
+.undo-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  background-color: #1f2937;
+  color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+  animation: undo-toast-in 0.2s ease;
+}
+
+@keyframes undo-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.undo-toast-text {
+  font-weight: 500;
+}
+
+.undo-toast-button {
+  border: none;
+  background: transparent;
+  color: #60a5fa;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.undo-toast-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
