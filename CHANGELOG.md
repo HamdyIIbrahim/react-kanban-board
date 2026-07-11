@@ -55,6 +55,25 @@ backend-friendly state model, and large-board performance.
 - **End-to-end test suite** — Playwright specs covering drag (mouse/touch/
   keyboard), delete modes, loading/empty, controlled/uncontrolled, WIP limits and
   virtualization (`npm test`).
+- **Theming** — a namespaced `--kb-*` design-token layer, a ready-made
+  `.kb-dark` theme, and `className` / `style` props to scope themes.
+- **Column reordering** — `enableColumnReorder` + `onColumnsReorder`; drag
+  columns via a header grip (mouse / touch / keyboard).
+- **Export / import** — `exportCardsToJSON` / `exportCardsToCSV` and
+  `importCardsFromJSON` / `importCardsFromCSV`.
+- **Backend persistence** — `usePersistentBoard` hook with optimistic updates
+  and automatic rollback on failure.
+- **Bulk actions** — `enableMultiSelect` with multi-select (Cmd/Ctrl-click,
+  Shift-range) and a bulk move/delete bar (`onBulkMove` / `onBulkDelete`).
+- **Typed card field schema** — `cardFields` (`CardFieldDef[]`) renders custom
+  fields in card details; `validateCard` validates them.
+- **Activity log** — `useActivityLog` builds a per-card audit trail.
+- **Realtime collaboration** — `diffCards` produces minimal patches for
+  websocket / Convex-style live sync (controlled mode + broadcast).
+- **Swimlanes** — `swimlaneBy` groups cards into horizontal lanes by a field;
+  dragging across lanes updates that field.
+- **Playground demo** — an interactive showcase with a live event stream and
+  four view presets (Default, CRM, Compact, Table).
 
 ### 🐛 Fixed
 
