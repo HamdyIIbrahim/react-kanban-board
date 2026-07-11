@@ -16,6 +16,7 @@ import {
   useSensors,
   closestCorners,
   closestCenter,
+  pointerWithin,
   useDroppable,
   type CollisionDetection,
   type DragStartEvent,
@@ -56,15 +57,132 @@ const COLUMN_DROP_PREFIX = "column:";
 // Prefix used for a column's sortable (drag-to-reorder) id.
 const COLUMN_SORT_PREFIX = "col:";
 
-// When dragging a column, only column droppables should be considered so the
-// drop snaps to a sibling column (not a card inside one). Cards use the normal
-// closest-corners strategy.
-const boardCollisionDetection: CollisionDetection = (args) => {
+// Separator between the lane value and the column key in a swimlane droppable.
+const LANE_SEP = "::";
+
+const laneOf = (card: Card, swimlaneBy: string): string =>
+  card[swimlaneBy] === undefined ||
+  card[swimlaneBy] === null ||
+  card[swimlaneBy] === ""
+    ? ""
+    : String(card[swimlaneBy]);
+
+// Reorder computation for swimlane mode. Drop targets encode lane + column, so
+// a move can change both the card's status and its swimlane field.
+function computeSwimlaneReorder(
+  cards: Card[],
+  columns: Column[],
+  activeId: string,
+  overId: string,
+  swimlaneBy: string
+):
+  | { nextCards: Card[]; destColumn: string; position: DropPosition }
+  | { wipBlockedColumn: string }
+  | null {
+  const activeCard = cards.find((c) => c.id === activeId);
+  if (!activeCard) return null;
+
+  let destColumn: string;
+  let destLane: string;
+  if (overId.startsWith(COLUMN_DROP_PREFIX)) {
+    const rest = overId.slice(COLUMN_DROP_PREFIX.length);
+    const idx = rest.indexOf(LANE_SEP);
+    if (idx === -1) return null;
+    destLane = rest.slice(0, idx);
+    destColumn = rest.slice(idx + LANE_SEP.length);
+  } else {
+    const overCard = cards.find((c) => c.id === overId);
+    if (!overCard) return null;
+    destColumn = overCard.status;
+    destLane = laneOf(overCard, swimlaneBy);
+  }
+
+  const isSameCell =
+    activeCard.status === destColumn && laneOf(activeCard, swimlaneBy) === destLane;
+
+  // WIP limit is enforced per column (across lanes).
+  if (activeCard.status !== destColumn) {
+    const limit = columns.find((col) => col.key === destColumn)?.limit;
+    if (limit !== undefined) {
+      const count = cards.filter(
+        (c) => c.status === destColumn && c.id !== activeId
+      ).length;
+      if (count >= limit) return { wipBlockedColumn: destColumn };
+    }
+  }
+
+  const cellIds = (all: Card[]) =>
+    all
+      .filter(
+        (c) =>
+          c.status === destColumn &&
+          laneOf(c, swimlaneBy) === destLane &&
+          c.id !== activeId
+      )
+      .map((c) => c.id);
+
+  let beforeId: string;
+  if (overId.startsWith(COLUMN_DROP_PREFIX)) {
+    beforeId = "-1";
+  } else {
+    const listNoActive = cellIds(cards);
+    const fullList = cards
+      .filter(
+        (c) => c.status === destColumn && laneOf(c, swimlaneBy) === destLane
+      )
+      .map((c) => c.id);
+    const activeIdx = fullList.indexOf(activeId);
+    const overIdx = fullList.indexOf(overId);
+    const overPos = listNoActive.indexOf(overId);
+    const insertPos =
+      isSameCell && activeIdx !== -1 && activeIdx < overIdx
+        ? overPos + 1
+        : overPos;
+    beforeId = listNoActive[insertPos] ?? "-1";
+  }
+
+  const rest = cards.filter((c) => c.id !== activeId);
+  const updated: Card = isSameCell
+    ? activeCard
+    : { ...activeCard, status: destColumn, [swimlaneBy]: destLane };
+  if (beforeId === "-1") {
+    rest.push(updated);
+  } else {
+    const idx = rest.findIndex((c) => c.id === beforeId);
+    if (idx === -1) rest.push(updated);
+    else rest.splice(idx, 0, updated);
+  }
+
+  const cell = rest.filter(
+    (c) => c.status === destColumn && laneOf(c, swimlaneBy) === destLane
+  );
+  const indexInCell = cell.findIndex((c) => c.id === activeId);
+  const position: DropPosition = {
+    prevTaskId: cell[indexInCell - 1]?.id ?? null,
+    nextTaskId: cell[indexInCell + 1]?.id ?? null,
+    index: indexInCell,
+  };
+  return { nextCards: rest, destColumn, position };
+}
+
+// Collision strategy:
+// - Column drags snap to sibling column sortables only.
+// - Swimlane card drags use pointer-based hit-testing so a card lands in the
+//   lane actually under the pointer (closestCorners misfires across stacked
+//   lanes).
+// - Plain card drags use closestCorners.
+const makeBoardCollisionDetection = (
+  swimlaneMode: boolean
+): CollisionDetection => (args) => {
   if (String(args.active.id).startsWith(COLUMN_SORT_PREFIX)) {
     const columnContainers = args.droppableContainers.filter((c) =>
       String(c.id).startsWith(COLUMN_SORT_PREFIX)
     );
     return closestCenter({ ...args, droppableContainers: columnContainers });
+  }
+  if (swimlaneMode) {
+    const hits = pointerWithin(args);
+    return hits.length ? hits : closestCenter(args);
   }
   return closestCorners(args);
 };
@@ -295,6 +413,11 @@ export interface KanbanBoardProps {
   undoDuration?: number;
   // Optional typed schema for custom card fields; rendered in card details.
   cardFields?: CardFieldDef[];
+  // Group cards into horizontal swimlanes by a card field (e.g. "assignee").
+  swimlaneBy?: string;
+  // Optional explicit swimlanes (value + label + order). Derived from card
+  // values when omitted.
+  swimlanes?: { value: string; label: string }[];
   // Enable drag-to-reorder of columns (via a grip in each column header).
   // Off by default.
   enableColumnReorder?: boolean;
@@ -364,6 +487,7 @@ interface ColumnProps {
     columnCardIds: string[]
   ) => void;
   cardFields?: CardFieldDef[];
+  laneValue?: string; // swimlane value; scopes the column's droppable id
 }
 
 interface AddCardProps {
@@ -523,6 +647,8 @@ const KanbanBoard = ({
   deleteConfirmation = "immediate",
   undoDuration = 5000,
   cardFields,
+  swimlaneBy,
+  swimlanes,
   enableColumnReorder = false,
   onColumnsReorder,
   enableMultiSelect = false,
@@ -700,12 +826,20 @@ const KanbanBoard = ({
       return;
     }
 
-    const result = computeReorder(
-      cardsRef.current,
-      columns,
-      String(active.id),
-      String(over.id)
-    );
+    const result = swimlaneBy
+      ? computeSwimlaneReorder(
+          cardsRef.current,
+          columns,
+          String(active.id),
+          String(over.id),
+          swimlaneBy
+        )
+      : computeReorder(
+          cardsRef.current,
+          columns,
+          String(active.id),
+          String(over.id)
+        );
     if (!result) return;
     if ("wipBlockedColumn" in result) {
       flashWipBlocked(result.wipBlockedColumn);
@@ -799,13 +933,20 @@ const KanbanBoard = ({
 
   const renderColumn = (
     column: Column,
-    columnDragHandle?: { attributes: any; listeners: any }
+    columnDragHandle?: { attributes: any; listeners: any },
+    laneValue?: string
   ) => (
     <ColumnComponent
       title={column.title}
       column={column.key}
       cards={cards}
-      filteredCards={filteredCards.filter((card) => card.status === column.key)}
+      filteredCards={filteredCards.filter(
+        (card) =>
+          card.status === column.key &&
+          (laneValue === undefined ||
+            !swimlaneBy ||
+            laneOf(card, swimlaneBy) === laneValue)
+      )}
       setCards={setCards}
       color={column.color}
       limit={column.limit}
@@ -831,8 +972,31 @@ const KanbanBoard = ({
       selectedIds={selectedIds}
       onToggleSelect={handleToggleSelect}
       cardFields={cardFields}
+      laneValue={laneValue}
     />
   );
+
+  // Derive swimlanes (explicit, or from card field values + an ungrouped lane).
+  const laneList: { value: string; label: string }[] = (() => {
+    if (!swimlaneBy) return [];
+    if (swimlanes && swimlanes.length) return swimlanes;
+    const seen = new Set<string>();
+    const lanes: { value: string; label: string }[] = [];
+    let hasUngrouped = false;
+    for (const c of cards) {
+      const v = laneOf(c, swimlaneBy);
+      if (v === "") {
+        hasUngrouped = true;
+        continue;
+      }
+      if (!seen.has(v)) {
+        seen.add(v);
+        lanes.push({ value: v, label: v });
+      }
+    }
+    if (hasUngrouped) lanes.push({ value: "", label: "Ungrouped" });
+    return lanes;
+  })();
 
   return (
     <div
@@ -925,35 +1089,65 @@ const KanbanBoard = ({
 
       <DndContext
         sensors={sensors}
-        collisionDetection={boardCollisionDetection}
+        collisionDetection={makeBoardCollisionDetection(!!swimlaneBy)}
         accessibility={{ announcements }}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="kanban-board">
-          {enableColumnReorder ? (
-            <SortableContext
-              items={orderedColumns.map((c) => COLUMN_SORT_PREFIX + c.key)}
-              strategy={horizontalListSortingStrategy}
-            >
-              {orderedColumns.map((column) => (
-                <SortableColumn
-                  key={column.key}
-                  id={COLUMN_SORT_PREFIX + column.key}
-                >
-                  {(handle) => renderColumn(column, handle)}
-                </SortableColumn>
-              ))}
-            </SortableContext>
-          ) : (
-            orderedColumns.map((column) => (
-              <React.Fragment key={column.key}>
-                {renderColumn(column)}
-              </React.Fragment>
-            ))
-          )}
-        </div>
+        {swimlaneBy ? (
+          <div className="kanban-swimlanes">
+            {laneList.map((lane) => (
+              <div
+                className="swimlane"
+                key={lane.value || "__ungrouped"}
+                data-testid={`swimlane-${lane.value || "ungrouped"}`}
+              >
+                <div className="swimlane-header">
+                  <span className="swimlane-title">{lane.label}</span>
+                  <span className="swimlane-count">
+                    {
+                      cards.filter(
+                        (c) => laneOf(c, swimlaneBy) === lane.value
+                      ).length
+                    }
+                  </span>
+                </div>
+                <div className="kanban-board">
+                  {orderedColumns.map((column) => (
+                    <React.Fragment key={`${lane.value}-${column.key}`}>
+                      {renderColumn(column, undefined, lane.value)}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="kanban-board">
+            {enableColumnReorder ? (
+              <SortableContext
+                items={orderedColumns.map((c) => COLUMN_SORT_PREFIX + c.key)}
+                strategy={horizontalListSortingStrategy}
+              >
+                {orderedColumns.map((column) => (
+                  <SortableColumn
+                    key={column.key}
+                    id={COLUMN_SORT_PREFIX + column.key}
+                  >
+                    {(handle) => renderColumn(column, handle)}
+                  </SortableColumn>
+                ))}
+              </SortableContext>
+            ) : (
+              orderedColumns.map((column) => (
+                <React.Fragment key={column.key}>
+                  {renderColumn(column)}
+                </React.Fragment>
+              ))
+            )}
+          </div>
+        )}
         {enableMultiSelect && selectedIds.size > 0 && (
           <div
             className="bulk-action-bar"
@@ -1061,10 +1255,15 @@ const ColumnComponent: React.FC<ColumnProps> = ({
   selectedIds,
   onToggleSelect,
   cardFields,
+  laneValue,
 }) => {
-  // Column-level droppable so empty columns and gaps still accept drops.
+  // Column-level droppable so empty columns and gaps still accept drops. In
+  // swimlane mode the id also encodes the lane.
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-    id: `${COLUMN_DROP_PREFIX}${column}`,
+    id:
+      laneValue !== undefined
+        ? `${COLUMN_DROP_PREFIX}${laneValue}${LANE_SEP}${column}`
+        : `${COLUMN_DROP_PREFIX}${column}`,
   });
   const shouldVirtualize =
     virtualizeColumnsOver !== undefined &&

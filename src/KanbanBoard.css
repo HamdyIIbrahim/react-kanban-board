@@ -263,6 +263,48 @@
   max-width: 75%;
 }
 
+/* Swimlanes */
+.kanban-swimlanes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0.5rem 0 2rem;
+}
+.swimlane {
+  border-radius: var(--kb-radius);
+}
+.swimlane-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 6px;
+  position: sticky;
+  left: 0;
+}
+.swimlane-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--kb-text);
+  text-transform: capitalize;
+}
+.swimlane-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--kb-text-muted);
+  background: var(--kb-elevated-bg);
+  border: 1px solid var(--kb-border);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+.swimlane .kanban-board {
+  min-height: auto;
+  padding-top: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+.swimlane .kanban-column {
+  max-height: none;
+}
+
 /* Column drag-to-reorder grip */
 .sortable-column-wrapper {
   display: flex;

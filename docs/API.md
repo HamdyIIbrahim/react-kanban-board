@@ -30,6 +30,8 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | `deleteConfirmation` | `DeleteConfirmation` | No | How to guard card deletion before onCardDelete fires. Defaults to "immediate". |
 | `undoDuration` | `number` | No | How long the undo toast stays before the delete is committed (ms). Default 5000. |
 | `cardFields` | `CardFieldDef[]` | No | Optional typed schema for custom card fields; rendered in card details. |
+| `swimlaneBy` | `string` | No | Group cards into horizontal swimlanes by a card field (e.g. "assignee"). |
+| `swimlanes` | `{ value: string; label: string }[]` | No | Optional explicit swimlanes (value + label + order). Derived from card values when omitted. |
 | `enableColumnReorder` | `boolean` | No | Enable drag-to-reorder of columns (via a grip in each column header). Off by default. |
 | `onColumnsReorder` | `(orderedKeys: string[]) => void` | No | Called with the new ordered column keys after a column is reordered. |
 | `enableMultiSelect` | `boolean` | No | Enable multi-select (Cmd/Ctrl-click to toggle, Shift-click for a range) with a bulk action bar. Off by default. |

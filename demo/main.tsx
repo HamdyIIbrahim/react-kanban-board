@@ -367,6 +367,7 @@ const App = () => {
   );
   const [realtime, setRealtime] = useState(params.get("realtime") === "1");
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const [swimlane, setSwimlane] = useState(params.get("swimlane") || "");
   const [virtualizeOver, setVirtualizeOver] = useState<number | undefined>(
     initialVirtualize
   );
@@ -524,6 +525,7 @@ const App = () => {
     deleteConfirmation: deleteMode,
     undoDuration: 3000,
     cardFields,
+    swimlaneBy: swimlane || undefined,
     className: theme === "dark" ? "kb-dark" : undefined,
     enableMultiSelect: multiSelect,
     onBulkMove: (ids: string[], status: string) => {
@@ -614,6 +616,25 @@ const App = () => {
                 key={v}
                 data-active={view === v}
                 onClick={() => setView(v)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="ctl">
+          <span className="ctl-label">Group by</span>
+          <div className="seg">
+            {[
+              ["", "None"],
+              ["assignee", "Assignee"],
+              ["priority", "Priority"],
+            ].map(([v, label]) => (
+              <button
+                key={v || "none"}
+                data-active={swimlane === v}
+                onClick={() => setSwimlane(v)}
               >
                 {label}
               </button>
