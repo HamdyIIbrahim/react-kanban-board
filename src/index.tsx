@@ -48,6 +48,8 @@ export type {
 } from "./usePersistentBoard";
 export { useActivityLog } from "./useActivityLog";
 export type { ActivityEntry, ActivityLog } from "./useActivityLog";
+export { diffCards } from "./realtime";
+export type { CardChange } from "./realtime";
 
 // Prefix used to identify a column's droppable area (vs. a card droppable).
 const COLUMN_DROP_PREFIX = "column:";

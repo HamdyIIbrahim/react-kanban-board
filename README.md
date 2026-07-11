@@ -300,6 +300,36 @@ const App = () => {
 export default App;
 ```
 
+## Realtime collaboration
+
+Because the board is fully controllable (`cards` + `onCardsChange`), wiring it to
+a websocket or a Convex-style live query is just: broadcast local changes and
+set `cards` from remote state. `diffCards` turns two card lists into a minimal
+patch so you can send changes (not the whole board) over the wire:
+
+```jsx
+import { diffCards, ControlledKanbanBoard } from "react-custom-kanban-board";
+
+const channel = new BroadcastChannel("board"); // or a websocket
+
+<ControlledKanbanBoard
+  cards={cards}
+  onCardsChange={(next) => {
+    const patch = diffCards(cards, next); // [{type:'move', id, from, to}, ...]
+    channel.postMessage(patch); // send only what changed
+    setCards(next);
+  }}
+  columns={columns}
+  columnForAddCard="todo"
+/>;
+
+// Apply remote updates by setting `cards` — the board just re-renders.
+channel.onmessage = (e) => setCards(applyPatch(cards, e.data));
+```
+
+Each `CardChange` is `add` / `remove` / `move` / `update`. The demo's **Realtime
+sync** toggle syncs two browser tabs live via `BroadcastChannel`.
+
 ## Activity log
 
 `useActivityLog` builds a lightweight per-card audit trail from the board's

@@ -16,7 +16,11 @@ import KanbanBoard, {
   usePersistentBoard,
   PersistenceAdapter,
   useActivityLog,
+  diffCards,
 } from "../src/index";
+
+// Per-tab id so realtime broadcasts ignore their own echo.
+const CLIENT_ID = Math.random().toString(36).slice(2);
 import "./showcase.css";
 
 const download = (name: string, text: string, type: string) => {
@@ -361,6 +365,8 @@ const App = () => {
   const [multiSelect, setMultiSelect] = useState(
     params.get("multiSelect") === "1"
   );
+  const [realtime, setRealtime] = useState(params.get("realtime") === "1");
+  const channelRef = useRef<BroadcastChannel | null>(null);
   const [virtualizeOver, setVirtualizeOver] = useState<number | undefined>(
     initialVirtualize
   );
@@ -458,6 +464,32 @@ const App = () => {
       window.alert("Import failed: " + (err as Error).message);
     }
     e.target.value = "";
+  };
+
+  // Realtime sync across tabs via BroadcastChannel (demo of controlled mode +
+  // diffCards). Open a second tab with ?realtime=1 to see live collaboration.
+  useEffect(() => {
+    if (!realtime || typeof BroadcastChannel === "undefined") return;
+    const ch = new BroadcastChannel("kanban-demo-sync");
+    ch.onmessage = (e) => {
+      if (!e.data || e.data.sender === CLIENT_ID) return;
+      setCtrlCards(e.data.cards);
+      setMode("controlled");
+      push("change", { count: e.data.cards.length, cols: "remote sync" });
+    };
+    channelRef.current = ch;
+    return () => {
+      ch.close();
+      channelRef.current = null;
+    };
+  }, [realtime]);
+
+  const handleRealtimeChange = (next: Card[]) => {
+    const changes = diffCards(ctrlCards, next);
+    // eslint-disable-next-line no-console
+    console.log("onDiff:", JSON.stringify(changes));
+    setCtrlCards(next);
+    channelRef.current?.postMessage({ sender: CLIENT_ID, cards: next });
   };
 
   // Live "cards in DOM" measurement (shows the virtualization win).
@@ -711,6 +743,14 @@ const App = () => {
               Multi-select
             </button>
             <button
+              className="btn toggle"
+              data-on={realtime}
+              onClick={() => setRealtime((v) => !v)}
+              title="Open a second tab with ?realtime=1 to sync live"
+            >
+              Realtime sync
+            </button>
+            <button
               className="btn ghost tiny"
               data-testid="bump"
               onClick={() => setTick((t) => t + 1)}
@@ -773,7 +813,14 @@ const App = () => {
             theme === "dark" ? "is-dark" : ""
           }`}
         >
-          {persistMode !== "off" ? (
+          {realtime ? (
+            <ControlledKanbanBoard
+              key="realtime"
+              {...commonProps}
+              cards={ctrlCards}
+              onCardsChange={handleRealtimeChange}
+            />
+          ) : persistMode !== "off" ? (
             <ControlledKanbanBoard
               key={`p-${persistMode}`}
               {...commonProps}
