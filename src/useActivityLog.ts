@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { DropPosition } from "./index";
+import type { DropPosition } from "./types";
 
 export interface ActivityEntry {
   id: string;

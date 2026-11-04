@@ -17,10 +17,13 @@ import KanbanBoard, {
   PersistenceAdapter,
   useActivityLog,
   diffCards,
+  KanbanLabels,
+  CardActions,
 } from "../src/index";
 
 // Per-tab id so realtime broadcasts ignore their own echo.
 const CLIENT_ID = Math.random().toString(36).slice(2);
+import "../src/KanbanBoard.css";
 import "./showcase.css";
 
 const download = (name: string, text: string, type: string) => {
@@ -51,15 +54,82 @@ const initialVirtualize = params.get("virtualize")
   ? Number(params.get("virtualize"))
   : undefined;
 const customLoadingParam = params.get("customLoading");
+const initialDetails = params.get("details") === "1";
+const initialColumnTools = params.get("columnTools") === "1";
+const initialRtl = params.get("rtl") === "1";
+const initialLoadMore = params.get("loadMore") === "1";
+// Backward-compat fixtures used by test/compat.spec.ts.
+const legacyCardParam = params.get("legacyCard") === "1";
+const asyncCardsParam = params.get("asyncCards") === "1";
+
+// A v2-style custom card: native `draggable` + the v2 handleDragStart(e, card).
+const legacyCard = (card: Card, handleDragStart: any) => (
+  <div
+    className="card"
+    draggable
+    onDragStart={(e) => handleDragStart(e, card)}
+    data-testid={`legacy-${card.id}`}
+  >
+    <h3 className="card-title">{card.title}</h3>
+  </div>
+);
+
+// ISO date `n` days from today, so due-date highlighting always has a mix of
+// overdue / due-soon / later cards.
+const daysFromNow = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+};
+
+// Arabic UI strings for the RTL demo (any subset of KanbanLabels).
+const arabicLabels: Partial<KanbanLabels> = {
+  searchPlaceholder: "ابحث في البطاقات...",
+  searchAriaLabel: "ابحث في البطاقات",
+  clearFilters: "مسح الفلاتر",
+  filterAll: () => "الكل",
+  addCard: "إضافة بطاقة",
+  addCardPlaceholder: "عنوان البطاقة...",
+  cancel: "إلغاء",
+  save: "حفظ",
+  delete: "حذف",
+  emptyColumn: "لا توجد بطاقات",
+  overdue: "متأخر",
+  dueToday: "مستحق اليوم",
+  dueSoon: "مستحق قريبًا",
+  loadMore: "تحميل المزيد",
+  loadingMore: "جارٍ التحميل...",
+  addColumn: "إضافة عمود",
+  cardDetails: "تفاصيل البطاقة",
+  fieldTitle: "العنوان",
+  fieldDescription: "الوصف",
+  fieldPriority: "الأولوية",
+  fieldDueDate: "تاريخ الاستحقاق",
+  fieldAssignee: "المسؤول",
+  fieldTags: "الوسوم",
+  none: "بدون",
+};
+
+// Older "archived" cards fetched page by page via the Done column's load-more.
+const archive: Card[] = Array.from({ length: 9 }, (_, i) => ({
+  id: `arch-${i + 1}`,
+  title: `Archived task ${i + 1}`,
+  status: "done",
+  priority: (["Low", "Medium", "High"] as const)[i % 3],
+  assignee: (["john", "sara", "mike"] as const)[i % 3],
+}));
 
 const baseColumns: Column[] = [
-  { title: "To Do", key: "todo", color: "#B8C2CC" },
+  { title: "To Do", key: "todo", color: "#B8C2CC", allowAddCard: true },
   { title: "In Progress", key: "in-progress", color: "#FFB1C1", limit: wipLimit },
   { title: "Review", key: "review", color: "#FFD580" },
   {
     title: "Done",
     key: "done",
     color: "#91D18B",
+    isDone: true,
     emptyMessage: "Nothing shipped yet 🚀",
   },
 ];
@@ -71,7 +141,7 @@ const baseCards: Card[] = [
     status: "todo",
     avatarPath: "https://i.pravatar.cc/40?img=1",
     priority: "High",
-    dueDate: "2026-07-30",
+    dueDate: daysFromNow(6),
     tags: ["frontend", "auth"],
     description: "Implement user registration, login, and password reset flows.",
     assignee: "john",
@@ -84,7 +154,7 @@ const baseCards: Card[] = [
     status: "todo",
     avatarPath: "https://i.pravatar.cc/40?img=2",
     priority: "Medium",
-    dueDate: "2026-07-22",
+    dueDate: daysFromNow(-2),
     tags: ["backend", "database"],
     description: "Define tables, relationships, and indexes for the app.",
     assignee: "sara",
@@ -95,7 +165,7 @@ const baseCards: Card[] = [
     status: "in-progress",
     avatarPath: "https://i.pravatar.cc/40?img=3",
     priority: "High",
-    dueDate: "2026-07-18",
+    dueDate: daysFromNow(1),
     tags: ["devops"],
     description: "Configure GitHub Actions for build, test, and deploy.",
     assignee: "mike",
@@ -106,7 +176,7 @@ const baseCards: Card[] = [
     status: "review",
     avatarPath: "https://i.pravatar.cc/40?img=4",
     priority: "Low",
-    dueDate: "2026-07-25",
+    dueDate: daysFromNow(0),
     tags: ["docs"],
     description: "Document all REST endpoints with examples.",
     assignee: "sara",
@@ -117,7 +187,7 @@ const baseCards: Card[] = [
     status: "done",
     avatarPath: "https://i.pravatar.cc/40?img=5",
     priority: "Medium",
-    dueDate: "2026-07-05",
+    dueDate: daysFromNow(-12),
     tags: ["frontend"],
     description: "Ship the marketing landing page to production.",
     assignee: "john",
@@ -247,7 +317,13 @@ const Avatar = ({ seed, path }: { seed: string; path?: string }) =>
   );
 
 // CRM lead-card renderer (matches the polished reference board).
-const crmCard = (card: Card, isDragging?: boolean) => (
+const crmCard = (
+  card: Card,
+  _dragStart: unknown,
+  _expanded: boolean | undefined,
+  _toggle: unknown,
+  { isDragging }: CardActions
+) => (
   <div className={`crm-card ${isDragging ? "is-dragging" : ""}`}>
     <div className="crm-top">
       <h4 className="crm-title">{card.title}</h4>
@@ -280,7 +356,13 @@ const crmCard = (card: Card, isDragging?: boolean) => (
 );
 
 // Compact / dense renderer.
-const compactCard = (card: Card, isDragging?: boolean) => (
+const compactCard = (
+  card: Card,
+  _dragStart: unknown,
+  _expanded: boolean | undefined,
+  _toggle: unknown,
+  { isDragging }: CardActions
+) => (
   <div className={`cmp-card ${isDragging ? "is-dragging" : ""}`}>
     <span
       className="cmp-pri"
@@ -351,7 +433,9 @@ const App = () => {
     params.get("theme") === "dark" ? "dark" : "light"
   );
   const [deleteMode, setDeleteMode] = useState<DeleteConfirmation>(initialDelete);
-  const [mode, setMode] = useState(initialMode);
+  const [mode, setMode] = useState(
+    initialLoadMore ? "controlled" : initialMode
+  );
   const [loadingSet, setLoadingSet] = useState<Set<string>>(
     new Set(initialLoading)
   );
@@ -371,6 +455,13 @@ const App = () => {
   const [virtualizeOver, setVirtualizeOver] = useState<number | undefined>(
     initialVirtualize
   );
+  const [details, setDetails] = useState(initialDetails);
+  const [columnTools, setColumnTools] = useState(initialColumnTools);
+  const [rtl, setRtl] = useState(initialRtl);
+  const [loadMore, setLoadMore] = useState(initialLoadMore);
+  const [archiveLoaded, setArchiveLoaded] = useState(0);
+  const archiveRef = useRef(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [events, setEvents] = useState<Evt[]>([]);
   const [domCount, setDomCount] = useState(0);
   const [, setTick] = useState(0);
@@ -387,12 +478,42 @@ const App = () => {
     [bulkCount, view]
   );
   const [ctrlCards, setCtrlCards] = useState<Card[]>(seed);
+  // ?asyncCards=1: uncontrolled board whose initialCards arrive after mount
+  // (the common v2 "fetch then render" pattern).
+  const [asyncSeed, setAsyncSeed] = useState<Card[]>([]);
+  useEffect(() => {
+    if (!asyncCardsParam) return;
+    const t = window.setTimeout(() => setAsyncSeed(seed.slice()), 300);
+    return () => window.clearTimeout(t);
+  }, [seed]);
   useEffect(() => setCtrlCards(seed), [seed]);
 
   const columns = useMemo(
-    () => baseColumns.map((c) => ({ ...c, isLoading: loadingSet.has(c.key) })),
-    [loadingSet]
+    () =>
+      baseColumns.map((c) => ({
+        ...c,
+        isLoading: loadingSet.has(c.key),
+        ...(loadMore && c.key === "done"
+          ? { hasMore: archiveLoaded < archive.length, isLoadingMore: loadingMore }
+          : {}),
+      })),
+    [loadingSet, loadMore, archiveLoaded, loadingMore]
   );
+
+  // Load-more (controlled mode): fetch the next page of archived cards.
+  const handleLoadMore = (columnKey: string) => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    window.setTimeout(() => {
+      const n = archiveRef.current;
+      const page = archive.slice(n, n + 3);
+      archiveRef.current = n + page.length;
+      setArchiveLoaded(archiveRef.current);
+      setCtrlCards((prev) => [...prev, ...page]);
+      push("change", { count: page.length, cols: `loaded more · ${columnKey}` });
+      setLoadingMore(false);
+    }, 600);
+  };
 
   const now = () =>
     new Date().toLocaleTimeString(undefined, {
@@ -430,6 +551,17 @@ const App = () => {
     console.log("onCardMove:", payload);
     push("move", payload);
     activity.onCardMove(cardId, newStatus, position);
+  };
+  const handleCardReorder = (
+    cardId: string,
+    status: string,
+    position: DropPosition
+  ) => {
+    const payload = { cardId, newStatus: status, ...position };
+    // eslint-disable-next-line no-console
+    console.log("onCardReorder:", payload);
+    push("move", payload);
+    activity.onCardMove(cardId, status, position);
   };
   const handleCardDelete = (cardId: string) => {
     // eslint-disable-next-line no-console
@@ -513,12 +645,34 @@ const App = () => {
 
   const commonProps = {
     columns,
-    columnForAddCard: "todo",
-    emptyColumnMessage: "No tasks yet",
+    emptyColumnMessage: rtl ? undefined : "No tasks yet",
+    dir: rtl ? ("rtl" as const) : undefined,
+    labels: rtl ? arabicLabels : undefined,
+    enableCardDetails: details,
+    enableColumnCollapse: columnTools,
+    enableColumnManagement: columnTools,
+    onLoadMore: loadMore ? handleLoadMore : undefined,
+    onCardAdd: (card: Card) => {
+      // eslint-disable-next-line no-console
+      console.log("onCardAdd:", card.id, card.title);
+      push("change", { count: 1, cols: `added “${card.title}”` });
+    },
+    onCardUpdate: (id: string, patch: Partial<Card>) => {
+      // eslint-disable-next-line no-console
+      console.log("onCardUpdate:", id, JSON.stringify(patch));
+      push("change", { count: 1, cols: `updated ${Object.keys(patch).join(", ")}` });
+    },
+    onColumnsChange: (cols: Column[]) => {
+      // eslint-disable-next-line no-console
+      console.log("onColumnsChange:", cols.map((c) => c.title).join(","));
+      push("change", { count: cols.length, cols: cols.map((c) => c.title).join(" · ") });
+    },
     enableSearch: true,
+    searchFields: ["title", "description", "tags", "assignee"],
     enableFiltering: true,
     filterConfigs,
     onCardMove: handleCardMove,
+    onCardReorder: handleCardReorder,
     onCardDelete: handleCardDelete,
     onCardEdit: (id: string, title: string) => activity.onCardEdit(id, title),
     onCardsChange: handleCardsChange,
@@ -545,8 +699,13 @@ const App = () => {
       push("change", { count: keys.length, cols: keys.join(" · ") });
     },
     virtualizeColumnsOver: virtualizeOver,
-    renderCard:
-      view === "crm" ? crmCard : view === "compact" ? compactCard : undefined,
+    renderCard: legacyCardParam
+      ? legacyCard
+      : view === "crm"
+      ? crmCard
+      : view === "compact"
+      ? compactCard
+      : undefined,
     renderColumnLoading: customLoadingParam
       ? (col: Column) => (
           <div data-testid={`custom-loading-${col.key}`}>
@@ -595,6 +754,9 @@ const App = () => {
             </span>
             <span className="cap">
               <Ic d={icons.lock} />WIP limits
+            </span>
+            <span className="cap">
+              <Ic d={icons.scale} />Headless · SSR
             </span>
           </div>
         </div>
@@ -782,6 +944,47 @@ const App = () => {
         </div>
 
         <div className="ctl">
+          <span className="ctl-label">Features</span>
+          <div className="ctl-row">
+            <button
+              className="btn toggle"
+              data-on={details}
+              onClick={() => setDetails((v) => !v)}
+              title="Double-click a card (or its open button) to edit every field"
+            >
+              Card details
+            </button>
+            <button
+              className="btn toggle"
+              data-on={columnTools}
+              onClick={() => setColumnTools((v) => !v)}
+              title="Collapse, rename, delete and add columns"
+            >
+              Column tools
+            </button>
+            <button
+              className="btn toggle"
+              data-on={loadMore}
+              onClick={() => {
+                setLoadMore((v) => !v);
+                setMode("controlled");
+              }}
+              title="Done column pages in archived cards as you scroll"
+            >
+              Load more
+            </button>
+            <button
+              className="btn toggle"
+              data-on={rtl}
+              onClick={() => setRtl((v) => !v)}
+              title="Right-to-left layout with translated labels"
+            >
+              RTL · عربي
+            </button>
+          </div>
+        </div>
+
+        <div className="ctl">
           <span className="ctl-label">Data</span>
           <div className="ctl-row">
             <button
@@ -858,6 +1061,10 @@ const App = () => {
                 handleCardMove(id, s, p);
                 persisted.onCardMove(id, s, p);
               }}
+              onCardReorder={(id, s, p) => {
+                handleCardReorder(id, s, p);
+                persisted.onCardReorder(id, s, p);
+              }}
               onCardDelete={(id) => {
                 handleCardDelete(id);
                 persisted.onCardDelete(id);
@@ -879,7 +1086,7 @@ const App = () => {
             <KanbanBoard
               key={`u-${bulkCount}-${view}`}
               {...commonProps}
-              initialCards={seed.slice()}
+              initialCards={asyncCardsParam ? asyncSeed : seed.slice()}
             />
           )}
         </main>

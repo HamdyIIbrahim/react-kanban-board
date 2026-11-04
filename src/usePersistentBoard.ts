@@ -1,29 +1,40 @@
 import { useCallback, useRef, useState } from "react";
-import type { Card, DropPosition } from "./index";
+import type { BaseCard, Card, DropPosition } from "./types";
 
 /**
  * Async backend hooks. Each returns a promise; if it rejects, the board rolls
  * back to the state before the mutation and `onError` is called.
  */
-export interface PersistenceAdapter {
+export interface PersistenceAdapter<TCard extends BaseCard = Card> {
   onCardMove?: (
     cardId: string,
     newStatus: string,
     position: DropPosition
   ) => Promise<void>;
+  // Same-column reorders. Defaults to onCardMove when omitted.
+  onCardReorder?: (
+    cardId: string,
+    status: string,
+    position: DropPosition
+  ) => Promise<void>;
   onCardEdit?: (cardId: string, newTitle: string) => Promise<void>;
+  onCardUpdate?: (cardId: string, patch: Partial<TCard>) => Promise<void>;
+  onCardAdd?: (card: TCard, columnKey: string) => Promise<void>;
   onCardDelete?: (cardId: string) => Promise<void>;
   onError?: (error: unknown) => void;
 }
 
-export interface PersistentBoard {
+export interface PersistentBoard<TCard extends BaseCard = Card> {
   /** Current cards — pass to a controlled board's `cards`. */
-  cards: Card[];
+  cards: TCard[];
   /** True while a backend call is in flight. */
   isSyncing: boolean;
-  onCardsChange: (next: Card[]) => void;
+  onCardsChange: (next: TCard[]) => void;
   onCardMove: (cardId: string, newStatus: string, position: DropPosition) => void;
+  onCardReorder: (cardId: string, status: string, position: DropPosition) => void;
   onCardEdit: (cardId: string, newTitle: string) => void;
+  onCardUpdate: (cardId: string, patch: Partial<TCard>) => void;
+  onCardAdd: (card: TCard, columnKey: string) => void;
   onCardDelete: (cardId: string) => void;
 }
 
@@ -40,28 +51,29 @@ export interface PersistentBoard {
  *   cards={board.cards}
  *   onCardsChange={board.onCardsChange}
  *   onCardMove={board.onCardMove}
+ *   onCardReorder={board.onCardReorder}
  *   onCardDelete={board.onCardDelete}
  *   onCardEdit={board.onCardEdit}
- *   columns={columns} columnForAddCard="todo"
+ *   columns={columns}
  * />
  * ```
  */
-export function usePersistentBoard(
-  initialCards: Card[],
-  adapter: PersistenceAdapter
-): PersistentBoard {
-  const [cards, setCards] = useState<Card[]>(initialCards);
+export function usePersistentBoard<TCard extends BaseCard = Card>(
+  initialCards: TCard[],
+  adapter: PersistenceAdapter<TCard>
+): PersistentBoard<TCard> {
+  const [cards, setCards] = useState<TCard[]>(initialCards);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const cardsRef = useRef<Card[]>(cards);
+  const cardsRef = useRef<TCard[]>(cards);
   cardsRef.current = cards;
   // Snapshot of the state before the in-flight mutation, used for rollback.
-  const snapshotRef = useRef<Card[]>(initialCards);
+  const snapshotRef = useRef<TCard[]>(initialCards);
   const adapterRef = useRef(adapter);
   adapterRef.current = adapter;
   const pending = useRef(0);
 
-  const onCardsChange = useCallback((next: Card[]) => {
+  const onCardsChange = useCallback((next: TCard[]) => {
     // Capture the pre-mutation state, then apply optimistically.
     snapshotRef.current = cardsRef.current;
     setCards(next);
@@ -93,10 +105,31 @@ export function usePersistentBoard(
     },
     [runPersist]
   );
+  const onCardReorder = useCallback(
+    (cardId: string, status: string, position: DropPosition) => {
+      const fn = adapterRef.current.onCardReorder ?? adapterRef.current.onCardMove;
+      runPersist(fn ? () => fn(cardId, status, position) : undefined);
+    },
+    [runPersist]
+  );
   const onCardEdit = useCallback(
     (cardId: string, newTitle: string) => {
       const fn = adapterRef.current.onCardEdit;
       runPersist(fn ? () => fn(cardId, newTitle) : undefined);
+    },
+    [runPersist]
+  );
+  const onCardUpdate = useCallback(
+    (cardId: string, patch: Partial<TCard>) => {
+      const fn = adapterRef.current.onCardUpdate;
+      runPersist(fn ? () => fn(cardId, patch) : undefined);
+    },
+    [runPersist]
+  );
+  const onCardAdd = useCallback(
+    (card: TCard, columnKey: string) => {
+      const fn = adapterRef.current.onCardAdd;
+      runPersist(fn ? () => fn(card, columnKey) : undefined);
     },
     [runPersist]
   );
@@ -113,7 +146,10 @@ export function usePersistentBoard(
     isSyncing,
     onCardsChange,
     onCardMove,
+    onCardReorder,
     onCardEdit,
+    onCardUpdate,
+    onCardAdd,
     onCardDelete,
   };
 }

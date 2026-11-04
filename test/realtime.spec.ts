@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { diffCards } from "../src/realtime";
+import { diffCards, applyCardChanges } from "../src/realtime";
 import type { Card } from "../src/index";
 import { drag, columnOrder } from "./helpers";
 
@@ -25,6 +25,22 @@ test.describe("diffCards", () => {
     });
     expect(changes).toContainEqual({ type: "add", card: next[2] });
     expect(changes).toContainEqual({ type: "remove", id: "9" });
+  });
+
+  test("applyCardChanges(prev, diffCards(prev, next)) reproduces next", () => {
+    const prev: Card[] = [
+      { id: "1", title: "a", status: "todo" },
+      { id: "2", title: "b", status: "todo" },
+      { id: "9", title: "gone", status: "done" },
+    ];
+    const next: Card[] = [
+      { id: "1", title: "a v2", status: "todo" }, // updated
+      { id: "2", title: "b v2", status: "done" }, // moved AND edited
+      { id: "3", title: "c", status: "todo" }, // added
+    ];
+    const applied = applyCardChanges(prev, diffCards(prev, next));
+    const byId = (list: Card[]) => [...list].sort((x, y) => x.id.localeCompare(y.id));
+    expect(byId(applied)).toEqual(byId(next));
   });
 
   test("no changes for identical lists", () => {

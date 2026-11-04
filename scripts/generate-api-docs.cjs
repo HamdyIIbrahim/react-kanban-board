@@ -4,7 +4,7 @@
  * reference cannot drift from the actual types. Run via `npm run docs`.
  *
  * It reads the exported interfaces / type aliases (and KanbanBoardProps)
- * directly out of src/index.tsx and renders markdown tables. Descriptions
+ * directly out of the source files below and renders markdown tables. Descriptions
  * come from leading or trailing `//` comments on each member.
  */
 const fs = require("fs");
@@ -12,23 +12,44 @@ const path = require("path");
 const ts = require("typescript");
 
 const ROOT = path.resolve(__dirname, "..");
-const SRC = path.join(ROOT, "src", "index.tsx");
+const SOURCES = ["types.ts", "useKanban.ts", "labels.ts"].map((f) =>
+  path.join(ROOT, "src", f)
+);
 const OUT = path.join(ROOT, "docs", "API.md");
 
 // Order in which types are documented.
 const INTERFACES = [
   ["KanbanBoardProps", "KanbanBoard props"],
   ["Column", "Column"],
-  ["Card", "Card"],
+  ["BaseCard", "Card (BaseCard)"],
   ["DropPosition", "DropPosition"],
+  ["CardActions", "CardActions"],
+  ["ColumnHeaderInfo", "ColumnHeaderInfo"],
+  ["CardDetailsHelpers", "CardDetailsHelpers"],
+  ["PriorityDef", "PriorityDef"],
   ["CardFieldDef", "CardFieldDef"],
   ["FilterConfig", "FilterConfig"],
   ["FilterOption", "FilterOption"],
+  ["UseKanbanOptions", "useKanban options"],
+  ["KanbanController", "useKanban return value (KanbanController)"],
+  ["KanbanLabels", "KanbanLabels"],
 ];
-const TYPE_ALIASES = [["DeleteConfirmation", "DeleteConfirmation"]];
+const TYPE_ALIASES = [
+  ["DeleteConfirmation", "DeleteConfirmation"],
+  ["RenderCard", "RenderCard"],
+  ["MoveResult", "MoveResult"],
+];
 
-const fullText = fs.readFileSync(SRC, "utf8");
-const sf = ts.createSourceFile(SRC, fullText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const files = SOURCES.map((file) => {
+  const text = fs.readFileSync(file, "utf8");
+  return {
+    text,
+    sf: ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX),
+  };
+});
+// Current file context for the helpers below.
+let fullText = "";
+let sf = null;
 
 const cleanComment = (raw) =>
   raw
@@ -65,16 +86,23 @@ const normalizeType = (t) =>
 const mdEscape = (s) => s.replace(/\|/g, "\\|");
 
 const findDeclaration = (name) => {
-  let found = null;
-  sf.forEachChild((node) => {
-    if (
-      (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) &&
-      node.name.text === name
-    ) {
-      found = node;
+  for (const f of files) {
+    let found = null;
+    f.sf.forEachChild((node) => {
+      if (
+        (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) &&
+        node.name.text === name
+      ) {
+        found = node;
+      }
+    });
+    if (found) {
+      fullText = f.text;
+      sf = f.sf;
+      return found;
     }
-  });
-  return found;
+  }
+  return null;
 };
 
 const renderInterface = (name, heading) => {
@@ -124,7 +152,8 @@ const parts = [
   "",
   "# API Reference",
   "",
-  "This file is generated from the TypeScript types in `src/index.tsx` and is",
+  "This file is generated from the TypeScript types in `src/types.ts`,",
+  "`src/useKanban.ts` and `src/labels.ts` and is",
   "the authoritative reference for the public API. Regenerate with `npm run docs`.",
   "",
 ];

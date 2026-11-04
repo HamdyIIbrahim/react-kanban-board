@@ -2,7 +2,8 @@
 
 # API Reference
 
-This file is generated from the TypeScript types in `src/index.tsx` and is
+This file is generated from the TypeScript types in `src/types.ts`,
+`src/useKanban.ts` and `src/labels.ts` and is
 the authoritative reference for the public API. Regenerate with `npm run docs`.
 
 ### KanbanBoard props
@@ -10,40 +11,64 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | Property | Type | Required | Description |
 | --- | --- | --- | --- |
 | `columns` | `Column[]` | Yes |  |
-| `initialCards` | `Card[]` | No | Uncontrolled mode: the board owns card state, seeded once from initialCards. |
-| `cards` | `Card[]` | No | Controlled mode: when provided, the board renders these cards directly and never mutates internal state. Pair with onCardsChange to receive updates. |
-| `onCardsChange` | `(cards: Card[]) => void` | No | Called with the full next card list on every internal mutation (move, edit, delete, add). Required for controlled mode; also fires in uncontrolled mode. |
+| `initialCards` | `TCard[]` | No | Uncontrolled mode: the board owns card state, seeded once from initialCards. |
+| `cards` | `TCard[]` | No | Controlled mode: when provided, the board renders these cards directly and never mutates internal state. Pair with onCardsChange to receive updates. |
+| `onCardsChange` | `(cards: TCard[]) => void` | No | Called with the full next card list on every internal mutation (move, edit, delete, add). Required for controlled mode; also fires in uncontrolled mode. |
 | `className` | `string` | No | Applied to the board root — use it to scope a theme (e.g. "kb-dark") or set --kb-* CSS variables via `style`. |
-| `style` | `React.CSSProperties` | No |  |
-| `columnForAddCard` | `string` | Yes |  |
-| `onCardMove` | `( cardId: string, newStatus: string, position: DropPosition ) => void` | No |  |
-| `onCardEdit` | `(cardId: string, newTitle: string) => void` | No |  |
+| `style` | `CSSProperties` | No |  |
+| `injectStyles` | `boolean` | No | Inject the default stylesheet automatically on the client (default true). Skipped when "react-custom-kanban-board/styles.css" is already loaded; set false for strict CSPs and import the stylesheet yourself. |
+| `styleNonce` | `string` | No | CSP nonce for the injected <style> tag. |
+| `dir` | `"ltr" \| "rtl"` | No | Text direction. "rtl" mirrors the layout for Arabic, Hebrew, Persian, etc. |
+| `labels` | `Partial<KanbanLabels>` | No | Override any built-in UI string (for translation / custom wording). |
+| `columnForAddCard` | `string` | No | Deprecated: prefer `allowAddCard` on each column. Key of the single column that shows the "Add card" control. |
+| `onCardAdd` | `(card: TCard, columnKey: string) => void` | No | Called after a card is created from the built-in "Add card" control. |
+| `onTaskAddedCallback` | `(title: string) => void` | No | Deprecated: use onCardAdd. Called with the new card's title. |
+| `createCardId` | `() => string` | No | Generates ids for cards created by the board. Defaults to a random UUID. |
+| `onCardMove` | `( cardId: string, newStatus: string, position: DropPosition ) => void` | No | Called when a card is moved to another column. |
+| `onCardReorder` | `( cardId: string, status: string, position: DropPosition ) => void` | No | Called when a card is reordered within its column (same arguments as onCardMove; `newStatus` is the unchanged column key). |
+| `onCardEdit` | `(cardId: string, newTitle: string) => void` | No | Called when a card's title is edited inline (or in the details panel). |
+| `onCardUpdate` | `(cardId: string, patch: Partial<TCard>) => void` | No | Called with the changed fields whenever a card is edited (inline title edit or the details panel). |
 | `onCardDelete` | `(cardId: string) => void` | No |  |
-| `onTaskAddedCallback` | `(title: string) => void` | No |  |
-| `renderCard` | `RenderCard` | No |  |
+| `renderCard` | `RenderCard<TCard>` | No |  |
 | `renderAvatar` | `(avatarPath?: string) => ReactNode` | No |  |
-| `renderAddCard` | `( column: string, setCards: React.Dispatch<React.SetStateAction<Card[]>> ) => ReactNode` | No |  |
+| `renderAddCard` | `( column: string, setCards: Dispatch<SetStateAction<TCard[]>> ) => ReactNode` | No |  |
+| `renderColumnHeader` | `(column: Column, info: ColumnHeaderInfo) => ReactNode` | No | Custom column header (replaces the built-in title / counter row). |
+| `priorities` | `PriorityDef[]` | No | Priority levels (value, label, colour). Defaults to Low / Medium / High. |
+| `highlightDueDates` | `boolean` | No | Highlight overdue and due-soon cards. Default true. |
+| `dueSoonDays` | `number` | No | A card counts as "due soon" within this many days. Default 2. |
+| `enableCardDetails` | `boolean` | No | Open a details panel (double-click a card, or its open button) to view and edit every field. Off by default. |
+| `renderCardDetails` | `( card: TCard, helpers: CardDetailsHelpers<TCard> ) => ReactNode` | No | Replace the built-in details panel body. |
+| `renderCardDetailsExtra` | `(card: TCard) => ReactNode` | No | Extra content under the built-in details form (comments, checklists...). |
 | `isLoading` | `boolean` | No |  |
 | `loadingComponent` | `ReactNode` | No |  |
 | `emptyColumnMessage` | `string` | No |  |
 | `renderColumnLoading` | `(column: Column) => ReactNode` | No | Custom per-column loading UI, shown when a column has isLoading set. |
+| `onLoadMore` | `(columnKey: string) => void` | No | Called when a column with `hasMore` scrolls its load-more trigger into view. |
 | `deleteConfirmation` | `DeleteConfirmation` | No | How to guard card deletion before onCardDelete fires. Defaults to "immediate". |
 | `undoDuration` | `number` | No | How long the undo toast stays before the delete is committed (ms). Default 5000. |
 | `cardFields` | `CardFieldDef[]` | No | Optional typed schema for custom card fields; rendered in card details. |
-| `swimlaneBy` | `string` | No | Group cards into horizontal swimlanes by a card field (e.g. "assignee"). |
+| `swimlaneBy` | `Extract<keyof TCard, string>` | No | Group cards into horizontal swimlanes by a card field (e.g. "assignee"). |
 | `swimlanes` | `{ value: string; label: string }[]` | No | Optional explicit swimlanes (value + label + order). Derived from card values when omitted. |
 | `enableColumnReorder` | `boolean` | No | Enable drag-to-reorder of columns (via a grip in each column header). Off by default. |
 | `onColumnsReorder` | `(orderedKeys: string[]) => void` | No | Called with the new ordered column keys after a column is reordered. |
+| `enableColumnCollapse` | `boolean` | No | Let users collapse columns to a narrow strip. Off by default. |
+| `onColumnCollapseChange` | `(columnKey: string, collapsed: boolean) => void` | No | Called when a column is collapsed or expanded. |
+| `enableColumnManagement` | `boolean` | No | Let users add, rename and delete columns. Off by default. |
+| `onColumnsChange` | `(columns: Column[]) => void` | No | Called with the full next column list whenever columns are added, renamed, deleted or reordered. |
+| `onColumnAdd` | `(column: Column) => void` | No |  |
+| `onColumnRename` | `(columnKey: string, title: string) => void` | No |  |
+| `onColumnDelete` | `(columnKey: string, removedCardIds: string[]) => void` | No | Called when a column is deleted, with the ids of the cards removed with it. |
 | `enableMultiSelect` | `boolean` | No | Enable multi-select (Cmd/Ctrl-click to toggle, Shift-click for a range) with a bulk action bar. Off by default. |
 | `onBulkMove` | `(cardIds: string[], newStatus: string) => void` | No | Called when selected cards are moved to a column in bulk. |
 | `onBulkDelete` | `(cardIds: string[]) => void` | No | Called when selected cards are deleted in bulk. |
 | `virtualizeColumnsOver` | `number` | No | Virtualize (window) a column's card list once it exceeds this many cards. Off by default. Keeps very large columns (hundreds of cards) performant. |
 | `virtualItemEstimatedHeight` | `number` | No | Estimated card height in px, used by the virtualizer. Default 120. |
 | `enableSearch` | `boolean` | No |  |
+| `searchFields` | `string[]` | No | Card fields the search box matches against. Default ["title"]. |
 | `enableFiltering` | `boolean` | No |  |
-| `filterConfigs` | `FilterConfig[]` | No | New prop for custom filters |
-| `onFilterChange` | `(filters: Record<string, string \| null>) => void` | No | Optional callback |
-| `renderSearchInput` | `( searchTerm: string, setSearchTerm: React.Dispatch<React.SetStateAction<string>> ) => ReactNode` | No |  |
+| `filterConfigs` | `FilterConfig[]` | No |  |
+| `onFilterChange` | `(filters: Record<string, string \| null>) => void` | No |  |
+| `renderSearchInput` | `( searchTerm: string, setSearchTerm: Dispatch<SetStateAction<string>> ) => ReactNode` | No |  |
 | `renderFilterMenu` | `( config: FilterConfig, value: string \| null, handleFilterChange: (field: string, value: string \| null) => void ) => ReactNode` | No |  |
 
 ### Column
@@ -52,21 +77,26 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | --- | --- | --- | --- |
 | `title` | `string` | Yes |  |
 | `key` | `string` | Yes |  |
-| `color` | `string` | Yes |  |
+| `color` | `string` | Yes | Header background colour. |
 | `limit` | `number` | No | Optional WIP limit |
 | `isLoading` | `boolean` | No | Optional per-column loading state (e.g. lazy-loaded data) |
 | `emptyMessage` | `string` | No | Optional per-column empty message (overrides emptyColumnMessage) |
+| `allowAddCard` | `boolean` | No | Show the "Add card" control in this column. |
+| `collapsed` | `boolean` | No | Initial collapsed state (requires enableColumnCollapse). |
+| `isDone` | `boolean` | No | Marks a "done" column: due dates are not highlighted as overdue here. |
+| `hasMore` | `boolean` | No | More cards can be fetched for this column; shows a load-more trigger that calls onLoadMore when scrolled into view. |
+| `isLoadingMore` | `boolean` | No | A load-more request for this column is in flight. |
 
-### Card
+### Card (BaseCard)
 
 | Property | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | `string` | Yes |  |
 | `title` | `string` | Yes |  |
-| `status` | `string` | Yes |  |
+| `status` | `string` | Yes | Key of the column the card is in. |
 | `avatarPath` | `string` | No |  |
-| `priority` | `"Low" \| "Medium" \| "High"` | No |  |
-| `dueDate` | `string` | No |  |
+| `priority` | `string` | No | "Low" \| "Medium" \| "High" are styled out of the box; any other value can be labelled and coloured through the board's `priorities` prop. |
+| `dueDate` | `string` | No | ISO date (e.g. "2026-11-30"). Overdue / due-soon cards are highlighted. |
 | `tags` | `string[]` | No |  |
 | `description` | `string` | No |  |
 | `assignee` | `string` | No |  |
@@ -78,6 +108,42 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | `prevTaskId` | `string \| null` | Yes | Id of the card immediately before the dropped card in the destination column, or null if it was dropped at the top. |
 | `nextTaskId` | `string \| null` | Yes | Id of the card immediately after the dropped card in the destination column, or null if it was dropped at the bottom. |
 | `index` | `number` | Yes | Zero-based index of the dropped card within the destination column. |
+
+### CardActions
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `isDragging` | `boolean` | Yes | True for the card being dragged (and for the drag overlay copy). |
+| `edit` | `() => void` | Yes |  |
+| `delete` | `() => void` | Yes |  |
+| `openDetails` | `() => void` | Yes | Opens the card details panel (when enableCardDetails is on). |
+| `isSelected` | `boolean` | Yes |  |
+
+### ColumnHeaderInfo
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `count` | `number` | Yes |  |
+| `limit` | `number` | No |  |
+| `isLimitExceeded` | `boolean` | Yes |  |
+| `isCollapsed` | `boolean` | Yes |  |
+| `toggleCollapse` | `() => void` | Yes |  |
+
+### CardDetailsHelpers
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `close` | `() => void` | Yes |  |
+| `update` | `(patch: Partial<TCard>) => void` | Yes |  |
+| `remove` | `() => void` | Yes |  |
+
+### PriorityDef
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string` | Yes |  |
+| `label` | `string` | No |  |
+| `color` | `string` | No |  |
 
 ### CardFieldDef
 
@@ -104,10 +170,119 @@ the authoritative reference for the public API. Regenerate with `npm run docs`.
 | `value` | `string` | Yes |  |
 | `label` | `string` | Yes |  |
 
+### useKanban options
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `columns` | `Column[]` | Yes |  |
+| `initialCards` | `TCard[]` | No | Uncontrolled: seeds card state, and re-seeds it whenever its *content* changes (e.g. data that arrives asynchronously). A re-render that passes an equal array does not reset the user's drag ordering. |
+| `cards` | `TCard[]` | No | Controlled: render these cards; pair with onCardsChange. |
+| `onCardsChange` | `(cards: TCard[]) => void` | No |  |
+| `onColumnsChange` | `(columns: Column[]) => void` | No | Called with the next column list after any column change. |
+| `createCardId` | `() => string` | No | Id generator for cards / columns created through the API. |
+| `preserveColumnOrder` | `boolean` | No | Keep the user's column order when the `columns` prop changes (used with column drag-to-reorder). Default false: the prop order wins. |
+
+### useKanban return value (KanbanController)
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `cards` | `TCard[]` | Yes |  |
+| `setCards` | `Dispatch<SetStateAction<TCard[]>>` | Yes |  |
+| `columns` | `Column[]` | Yes |  |
+| `setColumns` | `(update: SetStateAction<Column[]>) => void` | Yes |  |
+| `getColumnCards` | `(columnKey: string) => TCard[]` | Yes | Cards in a column, in display order. |
+| `addCard` | `( columnKey: string, data: Partial<TCard> & { title: string } ) => TCard` | Yes |  |
+| `updateCard` | `(cardId: string, patch: Partial<TCard>) => void` | Yes |  |
+| `deleteCard` | `(cardId: string) => void` | Yes |  |
+| `moveCard` | `(cardId: string, toColumn: string, toIndex?: number) => MoveResult` | Yes | Move a card to a column / index (end by default). Respects WIP limits. |
+| `addColumn` | `(column: Partial<Column> & { title: string }) => Column` | Yes |  |
+| `renameColumn` | `(columnKey: string, title: string) => void` | Yes |  |
+| `deleteColumn` | `(columnKey: string) => string[]` | Yes | Removes the column and its cards; returns the removed card ids. |
+| `moveColumn` | `(fromKey: string, toKey: string) => void` | Yes | Move column `fromKey` to the position of `toKey`. |
+
+### KanbanLabels
+
+| Property | Type | Required | Description |
+| --- | --- | --- | --- |
+| `loadingBoard` | `string` | Yes |  |
+| `emptyColumn` | `string` | Yes |  |
+| `searchPlaceholder` | `string` | Yes |  |
+| `searchAriaLabel` | `string` | Yes |  |
+| `clearSearch` | `string` | Yes |  |
+| `filterAll` | `(fieldLabel: string) => string` | Yes |  |
+| `filterBy` | `(fieldLabel: string) => string` | Yes |  |
+| `clearFilters` | `string` | Yes |  |
+| `addCard` | `string` | Yes |  |
+| `addCardPlaceholder` | `string` | Yes |  |
+| `addCardAriaLabel` | `string` | Yes |  |
+| `newCardTitle` | `string` | Yes |  |
+| `cancel` | `string` | Yes |  |
+| `save` | `string` | Yes |  |
+| `close` | `string` | Yes |  |
+| `delete` | `string` | Yes |  |
+| `editCard` | `string` | Yes |  |
+| `editCardTitle` | `string` | Yes |  |
+| `deleteCard` | `string` | Yes |  |
+| `openCard` | `string` | Yes |  |
+| `expandCard` | `string` | Yes |  |
+| `collapseCard` | `string` | Yes |  |
+| `deleteConfirm` | `string` | Yes |  |
+| `cardDeleted` | `string` | Yes |  |
+| `undo` | `string` | Yes |  |
+| `wipReached` | `(limit: number) => string` | Yes |  |
+| `selectedCount` | `(count: number) => string` | Yes |  |
+| `moveTo` | `string` | Yes |  |
+| `clear` | `string` | Yes |  |
+| `bulkActions` | `string` | Yes |  |
+| `ungrouped` | `string` | Yes |  |
+| `due` | `string` | Yes |  |
+| `overdue` | `string` | Yes |  |
+| `dueToday` | `string` | Yes |  |
+| `dueSoon` | `string` | Yes |  |
+| `loadMore` | `string` | Yes |  |
+| `loadingMore` | `string` | Yes |  |
+| `reorderColumn` | `(columnTitle: string) => string` | Yes |  |
+| `collapseColumn` | `(columnTitle: string) => string` | Yes |  |
+| `expandColumn` | `(columnTitle: string) => string` | Yes |  |
+| `addColumn` | `string` | Yes |  |
+| `newColumnTitle` | `string` | Yes |  |
+| `renameColumn` | `(columnTitle: string) => string` | Yes |  |
+| `deleteColumn` | `(columnTitle: string) => string` | Yes |  |
+| `deleteColumnConfirm` | `(columnTitle: string, cardCount: number) => string` | Yes |  |
+| `cardDetails` | `string` | Yes |  |
+| `fieldTitle` | `string` | Yes |  |
+| `fieldDescription` | `string` | Yes |  |
+| `fieldPriority` | `string` | Yes |  |
+| `fieldDueDate` | `string` | Yes |  |
+| `fieldAssignee` | `string` | Yes |  |
+| `fieldTags` | `string` | Yes |  |
+| `tagsHint` | `string` | Yes |  |
+| `none` | `string` | Yes |  |
+| `announcePickUp` | `(cardTitle: string) => string` | Yes |  |
+| `announceOver` | `(cardTitle: string, targetTitle: string) => string` | Yes |  |
+| `announceNotOver` | `(cardTitle: string) => string` | Yes |  |
+| `announceDrop` | `(cardTitle: string, targetTitle: string) => string` | Yes |  |
+| `announceDropBack` | `(cardTitle: string) => string` | Yes |  |
+| `announceCancel` | `(cardTitle: string) => string` | Yes |  |
+
 ### DeleteConfirmation
 
-How a card deletion is guarded before onCardDelete is fired. - "immediate": fire onCardDelete right away (default, backwards compatible) - "confirm":   show an inline confirmation prompt first - "undo":      remove the card immediately but defer onCardDelete, showing a brief undo toast that can restore the card
+How a card deletion is guarded before onCardDelete is fired. - "immediate": fire onCardDelete right away (default) - "confirm":   show an inline confirmation prompt first - "undo":      remove the card immediately but defer onCardDelete, showing a brief undo toast that can restore the card
 
 ```ts
 type DeleteConfirmation = "immediate" | "confirm" | "undo";
+```
+
+### RenderCard
+
+Signature for custom card renderers (the v2 signature plus a 5th `actions` argument carrying `isDragging`, `edit`, `delete`, `openDetails`, `isSelected`).
+
+```ts
+type RenderCard = ( card: TCard, handleDragStart: LegacyDragStartHandler<TCard>, isExpanded: boolean | undefined, toggleExpand: (id: string) => void, actions: CardActions ) => ReactNode;
+```
+
+### MoveResult
+
+```ts
+type MoveResult = | { ok: true; position: DropPosition } | { ok: false; reason: "not-found" | "wip-limit" | "no-op" };
 ```
