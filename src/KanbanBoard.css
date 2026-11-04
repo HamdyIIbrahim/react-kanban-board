@@ -1,14 +1,99 @@
+/* =========================================================================
+   Design tokens — override any --kb-* variable (globally on :root, or scoped
+   to a wrapper via the board's `className` / `style` props) to reskin the
+   board without fighting selector specificity. A ready-made dark theme ships
+   as `.kb-dark` (pass className="kb-dark").
+   ========================================================================= */
 :root {
-  --board-bg: #f5f6f8;
-  --column-bg: #f8f9fa;
-  --card-bg: #ffffff;
-  --text-color: #1a1a1a;
-  --accent-color: #228be6;
-  --border-radius: 12px;
-  --shadow-color: rgba(0, 0, 0, 0.1);
-  --border-color: rgba(0, 0, 0, 0.05);
-  --muted-text: #666;
-  --hover-bg: rgba(34, 139, 230, 0.1);
+  /* Marker: tells the board the stylesheet is already loaded (so it doesn't
+     inject its own copy). */
+  --kb-stylesheet: 1;
+
+  /* Surfaces */
+  --kb-board-bg: #f5f6f8;
+  --kb-column-bg: #f8f9fa;
+  --kb-card-bg: #ffffff;
+  --kb-elevated-bg: #ffffff;
+
+  /* Text */
+  --kb-text: #1a1a1a;
+  --kb-text-muted: #667085;
+
+  /* Accent + interaction */
+  --kb-accent: #228be6;
+  --kb-hover-bg: rgba(34, 139, 230, 0.1);
+
+  /* Lines, radii, shadows */
+  --kb-border: rgba(0, 0, 0, 0.06);
+  --kb-radius: 12px;
+  --kb-radius-sm: 8px;
+  --kb-card-radius: 12px;
+  --kb-shadow-color: rgba(0, 0, 0, 0.1);
+  --kb-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --kb-shadow-hover: 0 10px 24px -12px rgba(16, 24, 40, 0.28);
+
+  /* Priority accents */
+  --kb-priority-high: #ef4444;
+  --kb-priority-medium: #f59e0b;
+  --kb-priority-low: #10b981;
+
+  /* Due dates */
+  --kb-due-overdue: #dc2626;
+  --kb-due-overdue-bg: #fef2f2;
+  --kb-due-soon: #b45309;
+  --kb-due-soon-bg: #fffbeb;
+
+  /* Column header fallback + overlays */
+  --kb-column-header-bg: #64748b;
+  --kb-backdrop: rgba(15, 23, 42, 0.38);
+
+  /* Typography */
+  --kb-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* --- Back-compat aliases (previous variable names still work) --- */
+  --board-bg: var(--kb-board-bg);
+  --column-bg: var(--kb-column-bg);
+  --card-bg: var(--kb-card-bg);
+  --text-color: var(--kb-text);
+  --accent-color: var(--kb-accent);
+  --border-radius: var(--kb-radius);
+  --shadow-color: var(--kb-shadow-color);
+  --border-color: var(--kb-border);
+  --muted-text: var(--kb-text-muted);
+  --hover-bg: var(--kb-hover-bg);
+}
+
+/* Ready-made dark theme: <KanbanBoard className="kb-dark" /> */
+.kb-dark {
+  --kb-board-bg: #0f1115;
+  --kb-column-bg: #161922;
+  --kb-card-bg: #1b1f2a;
+  --kb-elevated-bg: #222635;
+  --kb-text: #e7e9ee;
+  --kb-text-muted: #9aa0ad;
+  --kb-accent: #6ea8fe;
+  --kb-hover-bg: rgba(110, 168, 254, 0.16);
+  --kb-border: rgba(255, 255, 255, 0.09);
+  --kb-shadow-color: rgba(0, 0, 0, 0.5);
+  --kb-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --kb-shadow-hover: 0 12px 28px -12px rgba(0, 0, 0, 0.6);
+  --kb-due-overdue: #f87171;
+  --kb-due-overdue-bg: rgba(248, 113, 113, 0.14);
+  --kb-due-soon: #fbbf24;
+  --kb-due-soon-bg: rgba(251, 191, 36, 0.14);
+  --kb-backdrop: rgba(0, 0, 0, 0.55);
+
+  /* Re-resolve the back-compat aliases against the dark tokens (they'd
+     otherwise stay light, having been substituted on :root). */
+  --board-bg: var(--kb-board-bg);
+  --column-bg: var(--kb-column-bg);
+  --card-bg: var(--kb-card-bg);
+  --text-color: var(--kb-text);
+  --accent-color: var(--kb-accent);
+  --shadow-color: var(--kb-shadow-color);
+  --border-color: var(--kb-border);
+  --muted-text: var(--kb-text-muted);
+  --hover-bg: var(--kb-hover-bg);
 }
 
 .kanban-board-container {
@@ -34,7 +119,7 @@
 
 .kanban-search {
   padding: 1rem;
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: var(--kb-column-bg);
   backdrop-filter: blur(5px);
   border-radius: var(--border-radius) var(--border-radius) 0 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
@@ -60,7 +145,7 @@
 }
 
 .search-input-wrapper svg {
-  margin-right: 0.5rem;
+  margin-inline-end: 0.5rem;
   color: var(--muted-text);
 }
 
@@ -115,7 +200,7 @@
   opacity: 0.8;
   transition: opacity 0.2s;
   white-space: nowrap;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .clear-filters:not(:disabled):hover {
@@ -179,6 +264,8 @@
 }
 
 .column-title {
+  background-color: var(--kb-column-header-bg);
+  gap: 0.5rem;
   padding: 1rem;
   font-weight: 700;
   font-size: 1.1rem;
@@ -197,14 +284,83 @@
   max-width: 75%;
 }
 
+/* Swimlanes */
+.kanban-swimlanes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0.5rem 0 2rem;
+}
+.swimlane {
+  border-radius: var(--kb-radius);
+}
+.swimlane-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 6px;
+  position: sticky;
+  inset-inline-start: 0;
+}
+.swimlane-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--kb-text);
+  text-transform: capitalize;
+}
+.swimlane-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--kb-text-muted);
+  background: var(--kb-elevated-bg);
+  border: 1px solid var(--kb-border);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+.swimlane .kanban-board {
+  min-height: auto;
+  padding-top: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+.swimlane .kanban-column {
+  max-height: none;
+}
+
+/* Column drag-to-reorder grip */
+.sortable-column-wrapper {
+  display: flex;
+}
+.column-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.5;
+  cursor: grab;
+  padding: 2px;
+  margin-inline-end: 6px;
+  border-radius: 6px;
+  touch-action: none;
+  transition: opacity 0.15s, background 0.15s;
+}
+.column-drag-handle:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}
+.column-drag-handle:active {
+  cursor: grabbing;
+}
+
 .column-counter-container {
   display: flex;
   align-items: center;
 }
 
 .counter {
-  background: white;
-  color: #333;
+  background: var(--kb-elevated-bg);
+  color: var(--kb-text);
   border-radius: 24px;
   padding: 0.3em 0.8em;
   font-weight: 700;
@@ -255,7 +411,7 @@
 .wip-limit-notification {
   position: absolute;
   top: 10px;
-  right: 10px;
+  inset-inline-end: 10px;
   background-color: #D32F2F;
   color: white;
   padding: 0.75rem 1.5rem;
@@ -279,18 +435,36 @@
 }
 
 .card {
-  background: var(--card-bg);
-  border-radius: 10px;
-  padding: 1.25rem;
-  box-shadow: 0 2px 5px var(--shadow-color);
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  transition: all 0.2s ease;
+  background: var(--kb-card-bg);
+  border-radius: var(--kb-card-radius);
+  padding: 1.1rem 1.15rem;
+  box-shadow: var(--kb-shadow);
+  border: 1px solid var(--kb-border);
+  color: var(--kb-text);
+  transition: box-shadow 0.18s ease, transform 0.18s ease,
+    border-color 0.18s ease;
   cursor: grab;
   max-width: 100%;
   width: 100%;
   overflow: hidden;
   box-sizing: border-box;
+  font-family: var(--kb-font);
+}
+
+.sortable-card-wrapper:hover .card {
+  box-shadow: var(--kb-shadow-hover);
+  transform: translateY(-1px);
+}
+
+/* Themeable priority accent (start border; mirrors in RTL) */
+.card.kb-pri-high {
+  border-inline-start: 3px solid var(--kb-priority-high);
+}
+.card.kb-pri-medium {
+  border-inline-start: 3px solid var(--kb-priority-medium);
+}
+.card.kb-pri-low {
+  border-inline-start: 3px solid var(--kb-priority-low);
 }
 
 /* Card Header */
@@ -304,7 +478,7 @@
 .card-title {
   font-size: 0.95rem;
   margin: 0;
-  padding-right: 4rem; /* Space for action buttons */
+  padding-inline-end: 4rem; /* Space for action buttons */
   font-weight: 500;
   word-break: break-word; /* Break long words */
   overflow-wrap: break-word; /* Handle overflow */
@@ -321,7 +495,7 @@
 .card-actions {
   position: absolute;
   top: 0.75rem;
-  right: 0.75rem;
+  inset-inline-end: 0.75rem;
   display: flex;
   gap: 0.4rem;
   opacity: 0;
@@ -413,7 +587,7 @@
 .detail-label {
   font-weight: 600;
   color: var(--muted-text);
-  margin-right: 0.5rem;
+  margin-inline-end: 0.5rem;
 }
 
 .detail-value {
@@ -526,7 +700,7 @@
 }
 
 .add-card span {
-  margin-right: 0.5rem;
+  margin-inline-end: 0.5rem;
   font-size: 1.2rem;
 }
 
@@ -628,7 +802,7 @@
   font-size: 0.9rem;
   font-weight: 500;
   color: #333;
-  border-left: 4px solid var(--accent-color);
+  border-inline-start: 4px solid var(--accent-color);
 }
 
 /* Custom scrollbar */
@@ -707,7 +881,7 @@
   }
   
   .clear-filters {
-    margin-left: 0;
+    margin-inline-start: 0;
     align-self: flex-end;
   }
 }
@@ -820,34 +994,34 @@
 }
 
 /* Fix WIP limit notification visibility in dark mode */
-[data-theme="dark"] .wip-limit-notification {
+.kb-dark .wip-limit-notification {
   background-color: #ef5350;
 }
 
 /* Ensure priority badges have good contrast in all themes */
-[data-theme="dark"] .priority-badge.high {
+.kb-dark .priority-badge.high {
   background-color: rgba(239, 68, 68, 0.2);
   color: #f87171;
 }
 
-[data-theme="dark"] .priority-badge.medium {
+.kb-dark .priority-badge.medium {
   background-color: rgba(245, 158, 11, 0.2);
   color: #fbbf24;
 }
 
-[data-theme="dark"] .priority-badge.low {
+.kb-dark .priority-badge.low {
   background-color: rgba(16, 185, 129, 0.2);
   color: #34d399;
 }
 
 /* Fix counter styling in dark mode */
-[data-theme="dark"] .counter {
+.kb-dark .counter {
   background: #334155;
   color: #f1f5f9;
 }
 
 /* Fix empty state styling in dark mode */
-[data-theme="dark"] .column-empty-state {
+.kb-dark .column-empty-state {
   color: var(--muted-text);
   border-color: var(--border-color);
   background-color: rgba(255, 255, 255, 0.03);
@@ -935,69 +1109,690 @@
 }
 
 /* Better dark mode theme support */
-[data-theme="dark"] {
+.kb-dark {
   --border-color: rgba(255, 255, 255, 0.1);
   --shadow-color: rgba(0, 0, 0, 0.4);
   --muted-text: #94a3b8;
 }
 
-[data-theme="dark"] .kanban-search {
+.kb-dark .kanban-search {
   background-color: rgba(30, 41, 59, 0.8);
   backdrop-filter: blur(5px);
   border-color: var(--border-color);
 }
 
-[data-theme="dark"] .add-card {
+.kb-dark .add-card {
   background-color: rgba(255, 255, 255, 0.03);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-[data-theme="dark"] .add-card:hover {
+.kb-dark .add-card:hover {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-[data-theme="dark"] .add-card-form {
+.kb-dark .add-card-form {
   background-color: var(--card-bg);
   border-color: var(--border-color);
 }
 
-[data-theme="dark"] .add-card-input {
+.kb-dark .add-card-input {
   background-color: rgba(0, 0, 0, 0.2);
   color: var(--text-color);
   border-color: var(--border-color);
 }
 
-[data-theme="dark"] .add-card-buttons button:first-child {
+.kb-dark .add-card-buttons button:first-child {
   background-color: var(--accent-color);
 }
 
-[data-theme="dark"] .add-card-buttons button:last-child {
+.kb-dark .add-card-buttons button:last-child {
   background-color: rgba(255, 255, 255, 0.1);
   color: var(--text-color);
 }
 
 /* Fix empty state styling in dark mode */
-[data-theme="dark"] .column-empty-state {
+.kb-dark .column-empty-state {
   color: var(--muted-text);
   border-color: var(--border-color);
   background-color: rgba(255, 255, 255, 0.03);
 }
 
 /* Fix card-edit for dark themes */
-[data-theme="dark"] .card-edit {
+.kb-dark .card-edit {
   background-color: var(--card-bg);
 }
 
-[data-theme="dark"] .card-edit input {
+.kb-dark .card-edit input {
   background-color: rgba(0, 0, 0, 0.2);
   color: var(--text-color);
   border-color: var(--border-color);
 }
 
 /* Fix drag preview for dark mode */
-[data-theme="dark"] .card-drag-preview {
+.kb-dark .card-drag-preview {
   background-color: var(--card-bg);
   color: var(--text-color);
   border-color: var(--accent-color);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* dnd-kit sortable card wrapper (drag handle = whole card) */
+.sortable-card-wrapper {
+  outline: none;
+  touch-action: manipulation;
+  cursor: grab;
+}
+
+.sortable-card-wrapper:focus-visible .card {
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+.card.dragging {
+  cursor: grabbing;
+}
+
+/* Multi-select */
+.sortable-card-wrapper.selected .card,
+.sortable-card-wrapper.selected > * {
+  box-shadow: 0 0 0 2px var(--kb-accent), var(--kb-shadow);
+}
+.sortable-card-wrapper.selected {
+  position: relative;
+}
+
+.bulk-action-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 20;
+  margin: 4px auto 0;
+  width: fit-content;
+  max-width: 96%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--kb-text);
+  color: var(--kb-card-bg);
+  border-radius: 999px;
+  box-shadow: var(--kb-shadow-hover);
+  font-family: var(--kb-font);
+}
+.bulk-count {
+  font-weight: 700;
+  font-size: 13px;
+  padding-inline-end: 4px;
+}
+.bulk-move-label {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.bulk-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bulk-btn:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.bulk-btn.danger {
+  background: var(--kb-priority-high);
+  color: #fff;
+}
+.bulk-btn.ghost {
+  background: transparent;
+  opacity: 0.75;
+}
+
+/* Drag overlay preview follows the pointer/keyboard focus */
+.card-drag-overlay {
+  cursor: grabbing;
+}
+
+.card-drag-overlay .card,
+.card.overlay {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  transform: rotate(2deg);
+}
+
+.card-slot {
+  position: relative;
+}
+
+/* Virtualized column: the content area becomes the scroll container */
+.column-content.virtualized {
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+.card-slot.virtual {
+  padding: 0 2px;
+}
+
+/* Per-column loading skeleton */
+.column-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.column-skeleton-card {
+  height: 64px;
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 25%,
+    rgba(0, 0, 0, 0.12) 37%,
+    rgba(0, 0, 0, 0.06) 63%
+  );
+  background-size: 400% 100%;
+  animation: column-skeleton-shimmer 1.4s ease infinite;
+}
+
+.column-skeleton-card:nth-child(2) {
+  height: 88px;
+}
+
+@keyframes column-skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.kb-dark .column-skeleton-card {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.12) 37%,
+    rgba(255, 255, 255, 0.06) 63%
+  );
+  background-size: 400% 100%;
+}
+
+/* Inline delete confirmation ("confirm" mode) */
+.delete-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -4px 0 8px;
+  padding: 8px 10px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-inline-start: 3px solid #ef4444;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow-color);
+  font-size: 13px;
+  color: var(--text-color);
+}
+
+.delete-confirm-text {
+  font-weight: 500;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.delete-confirm button {
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.delete-confirm button:hover {
+  opacity: 0.85;
+}
+
+.delete-confirm-cancel {
+  background-color: var(--hover-bg);
+  color: var(--text-color);
+}
+
+.delete-confirm-delete {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+/* Undo toast ("undo" mode) */
+.undo-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  background-color: #1f2937;
+  color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+  animation: undo-toast-in 0.2s ease;
+}
+
+@keyframes undo-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.undo-toast-text {
+  font-weight: 500;
+}
+
+.undo-toast-button {
+  border: none;
+  background: transparent;
+  color: #60a5fa;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.undo-toast-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* =========================================================================
+   3.0 additions: add-card button, animations, custom priorities, due dates,
+   column collapse / management, load-more, card details panel.
+   ========================================================================= */
+
+/* The add-card control is a real <button> (keyboard + screen-reader friendly). */
+button.add-card {
+  width: 100%;
+  font: inherit;
+  font-weight: 600;
+  gap: 0.4rem;
+}
+.add-card svg {
+  flex-shrink: 0;
+}
+
+@keyframes kb-expand-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kb-pop-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.kb-expand-in { animation: kb-expand-in 0.22s ease-out; }
+.kb-pop-in { animation: kb-pop-in 0.18s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .kb-expand-in, .kb-pop-in, .kb-details-panel { animation: none !important; }
+}
+
+/* Custom priorities: colour comes from the --kb-pri-color variable. */
+.card.kb-pri-custom {
+  border-inline-start: 3px solid var(--kb-pri-color);
+}
+.priority-badge.custom {
+  color: var(--kb-pri-color);
+  background: color-mix(in srgb, var(--kb-pri-color) 14%, transparent);
+}
+.priority-badge-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Due-date chip (overdue / due today / due soon). */
+.kb-due-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+.kb-due-chip.overdue,
+.kb-due-chip.today {
+  color: var(--kb-due-overdue);
+  background: var(--kb-due-overdue-bg);
+}
+.kb-due-chip.soon {
+  color: var(--kb-due-soon);
+  background: var(--kb-due-soon-bg);
+}
+.card.kb-due-overdue {
+  box-shadow: var(--kb-shadow), inset 0 0 0 1px color-mix(in srgb, var(--kb-due-overdue) 35%, transparent);
+}
+
+.card-action-button.open:hover {
+  color: var(--kb-accent);
+}
+
+/* Column header extras */
+.column-title-custom {
+  flex: 1;
+  min-width: 0;
+}
+.column-counter-container {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.column-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.16);
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.column-action:hover,
+.column-action:focus-visible {
+  background: rgba(0, 0, 0, 0.28);
+}
+.column-action svg {
+  width: 14px;
+  height: 14px;
+}
+.column-manage-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.kanban-column:hover .column-manage-actions,
+.column-title:focus-within .column-manage-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .column-manage-actions { opacity: 1; }
+}
+.column-rename-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 1rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.95);
+  color: #1a1a1a;
+}
+.column-delete-confirm {
+  margin: 0.6rem 0.75rem 0;
+}
+
+/* Collapsed column: a narrow strip that still accepts drops. */
+.kanban-column.collapsed {
+  width: 52px;
+  min-width: 52px;
+  align-self: stretch;
+  max-height: none;
+}
+.collapsed-column-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 220px;
+  height: 100%;
+  padding: 0.8rem 0;
+  border: none;
+  background-color: var(--kb-column-header-bg);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.collapsed-column-title {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+.collapsed-column-count {
+  font-size: 0.78rem;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+/* Load more */
+.kb-load-more {
+  width: 100%;
+  padding: 0.55rem;
+  margin-top: 0.25rem;
+  border: 1px dashed var(--kb-border);
+  border-radius: var(--kb-radius-sm);
+  background: transparent;
+  color: var(--kb-text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.kb-load-more:hover:not(:disabled) {
+  color: var(--kb-accent);
+  border-color: var(--kb-accent);
+}
+.kb-load-more:disabled {
+  cursor: progress;
+}
+
+/* Add column tile */
+.kb-add-column {
+  width: 280px;
+  min-width: 280px;
+}
+.kb-add-column-button {
+  width: 100%;
+  padding: 0.9rem;
+  border: 2px dashed var(--kb-border);
+  border-radius: var(--kb-radius);
+  background: transparent;
+  color: var(--kb-text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kb-add-column-button:hover {
+  color: var(--kb-accent);
+  border-color: var(--kb-accent);
+}
+.kb-add-column-form {
+  background: var(--kb-elevated-bg);
+  border-radius: var(--kb-radius);
+  padding: 0.75rem;
+  box-shadow: var(--kb-shadow-hover);
+}
+.kb-add-column-form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--kb-border);
+  border-radius: var(--kb-radius-sm);
+  background: var(--kb-card-bg);
+  color: var(--kb-text);
+  font: inherit;
+}
+
+/* Card details panel */
+.kb-details-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--kb-backdrop);
+  display: flex;
+  justify-content: flex-end;
+}
+@keyframes kb-panel-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+[dir="rtl"] .kb-details-backdrop { justify-content: flex-start; }
+.kb-details-panel {
+  width: min(460px, 100vw);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--kb-elevated-bg);
+  color: var(--kb-text);
+  font-family: var(--kb-font);
+  box-shadow: -12px 0 32px -12px var(--kb-shadow-color);
+  display: flex;
+  flex-direction: column;
+  animation: kb-panel-in 0.2s ease-out;
+  outline: none;
+}
+.kb-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--kb-border);
+  position: sticky;
+  top: 0;
+  background: inherit;
+  z-index: 1;
+}
+.kb-details-heading {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.kb-details-close {
+  border: none;
+  background: transparent;
+  color: var(--kb-text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+.kb-details-close:hover {
+  background: var(--kb-hover-bg);
+  color: var(--kb-text);
+}
+.kb-details-body {
+  padding: 1.1rem 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.kb-details-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.kb-details-field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--kb-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.kb-details-field input,
+.kb-details-field textarea,
+.kb-details-field select {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--kb-radius-sm);
+  border: 1px solid var(--kb-border);
+  background: var(--kb-card-bg);
+  color: var(--kb-text);
+  box-sizing: border-box;
+  width: 100%;
+}
+.kb-details-field textarea {
+  resize: vertical;
+}
+.kb-details-field input:focus,
+.kb-details-field textarea:focus,
+.kb-details-field select:focus {
+  outline: 2px solid color-mix(in srgb, var(--kb-accent) 45%, transparent);
+  border-color: var(--kb-accent);
+}
+.kb-details-extra {
+  border-top: 1px solid var(--kb-border);
+  padding-top: 0.9rem;
+}
+.kb-details-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+.kb-details-spacer {
+  flex: 1;
+}
+.kb-details-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+}
+.kb-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--kb-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.kb-btn.primary {
+  background: var(--kb-accent);
+  color: white;
+}
+.kb-btn.primary:hover {
+  filter: brightness(1.08);
+}
+.kb-btn.ghost {
+  background: transparent;
+  border-color: var(--kb-border);
+  color: var(--kb-text);
+}
+.kb-btn.ghost:hover {
+  background: var(--kb-hover-bg);
+}
+.kb-btn.danger {
+  background: var(--kb-priority-high);
+  color: white;
+}
+.kb-btn.danger-text {
+  color: var(--kb-priority-high);
+}
+
+/* RTL: the drag overlay inherits direction from the board. */
+[dir="rtl"] .kanban-board,
+[dir="rtl"] .kanban-search {
+  direction: rtl;
 }

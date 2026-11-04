@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Package works in plain Node (CJS, ESM, SSR)
+        run: npm run test:package
+      - name: Published types compile for consumers
+        run: npm run test:types
+      - name: README examples compile
+        run: npm run test:readme
+      - name: Package exports & types (publint, attw)
+        run: npm run lint:package
+      - name: Bundle size budget
+        run: npm run size
+      - name: API docs up to date
+        run: npm run docs:check
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
