@@ -6,7 +6,9 @@ optimistic persistence; let users manage columns and edit cards in a details
 panel; or skip the UI entirely and build your own board on the headless
 `useKanban` hook.
 
-![Dragging cards between columns, reordering, and opening the card details panel](./public/assets/images/demo.gif)
+![A 45-second tour of every feature: drag and drop, reordering, WIP limits, keyboard dragging, search and filters, the card details panel, adding cards, delete with undo, column tools, multi-select, swimlanes, dark theme, RTL, custom cards, virtualization and load more](./public/assets/images/demo.gif)
+
+<sub>The tour, in order: drag &amp; drop · reorder · WIP limits · keyboard drag · search &amp; filters · card details · add cards · delete with undo · column tools · multi-select &amp; bulk move · swimlanes · dark theme · RTL + translations · custom cards · 300+ cards virtualized · load more. Try it yourself: <code>npm run dev</code>.</sub>
 
 <table>
   <tr>
