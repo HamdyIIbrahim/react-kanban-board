@@ -1,6 +1,12 @@
 # Node modules
 /node_modules/
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/
+
 # Build output
 /dist/
 /build/
@@ -19,7 +25,6 @@ yarn-error.log*
 # Dependency directories
 /pnpm-lock.yaml
 /pnpm-store/
-package-lock.json
 yarn.lock
 
 # IDE and editor directories
@@ -58,6 +63,8 @@ Thumbs.db
 
 # Build artifacts
 *.d.ts
+# ...but keep hand-written declarations in the source tree
+!src/**/*.d.ts
 
 # Yarn
 .yarn/
@@ -67,3 +74,9 @@ Thumbs.db
 
 # Windows specific files
 Thumbs.db
+
+# Demo build
+/demo-dist/
+
+# README example check (generated)
+/.readme-examples/

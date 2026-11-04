@@ -1,27 +1,17 @@
 {
   "compilerOptions": {
-    "target": "ES5",
-    "module": "commonjs",
-    "lib": [
-      "DOM",
-      "ESNext"
-    ],
+    "target": "ES2018",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "jsx": "react-jsx",
-    "declaration": true,
-    "outDir": "./dist",
     "strict": true,
-    "moduleResolution": "node",
+    "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "rootDir": "./src"
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": [
-    "src/**/*",
-    "replacePaths.js"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
