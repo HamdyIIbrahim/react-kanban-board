@@ -5,6 +5,10 @@
    as `.kb-dark` (pass className="kb-dark").
    ========================================================================= */
 :root {
+  /* Marker: tells the board the stylesheet is already loaded (so it doesn't
+     inject its own copy). */
+  --kb-stylesheet: 1;
+
   /* Surfaces */
   --kb-board-bg: #f5f6f8;
   --kb-column-bg: #f8f9fa;
@@ -32,6 +36,16 @@
   --kb-priority-high: #ef4444;
   --kb-priority-medium: #f59e0b;
   --kb-priority-low: #10b981;
+
+  /* Due dates */
+  --kb-due-overdue: #dc2626;
+  --kb-due-overdue-bg: #fef2f2;
+  --kb-due-soon: #b45309;
+  --kb-due-soon-bg: #fffbeb;
+
+  /* Column header fallback + overlays */
+  --kb-column-header-bg: #64748b;
+  --kb-backdrop: rgba(15, 23, 42, 0.38);
 
   /* Typography */
   --kb-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -63,6 +77,11 @@
   --kb-shadow-color: rgba(0, 0, 0, 0.5);
   --kb-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --kb-shadow-hover: 0 12px 28px -12px rgba(0, 0, 0, 0.6);
+  --kb-due-overdue: #f87171;
+  --kb-due-overdue-bg: rgba(248, 113, 113, 0.14);
+  --kb-due-soon: #fbbf24;
+  --kb-due-soon-bg: rgba(251, 191, 36, 0.14);
+  --kb-backdrop: rgba(0, 0, 0, 0.55);
 
   /* Re-resolve the back-compat aliases against the dark tokens (they'd
      otherwise stay light, having been substituted on :root). */
@@ -126,7 +145,7 @@
 }
 
 .search-input-wrapper svg {
-  margin-right: 0.5rem;
+  margin-inline-end: 0.5rem;
   color: var(--muted-text);
 }
 
@@ -181,7 +200,7 @@
   opacity: 0.8;
   transition: opacity 0.2s;
   white-space: nowrap;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .clear-filters:not(:disabled):hover {
@@ -245,6 +264,8 @@
 }
 
 .column-title {
+  background-color: var(--kb-column-header-bg);
+  gap: 0.5rem;
   padding: 1rem;
   font-weight: 700;
   font-size: 1.1rem;
@@ -279,7 +300,7 @@
   gap: 10px;
   padding: 10px 14px 6px;
   position: sticky;
-  left: 0;
+  inset-inline-start: 0;
 }
 .swimlane-title {
   font-weight: 700;
@@ -319,7 +340,7 @@
   opacity: 0.5;
   cursor: grab;
   padding: 2px;
-  margin-right: 6px;
+  margin-inline-end: 6px;
   border-radius: 6px;
   touch-action: none;
   transition: opacity 0.15s, background 0.15s;
@@ -390,7 +411,7 @@
 .wip-limit-notification {
   position: absolute;
   top: 10px;
-  right: 10px;
+  inset-inline-end: 10px;
   background-color: #D32F2F;
   color: white;
   padding: 0.75rem 1.5rem;
@@ -435,15 +456,15 @@
   transform: translateY(-1px);
 }
 
-/* Themeable priority accent (left border) */
+/* Themeable priority accent (start border; mirrors in RTL) */
 .card.kb-pri-high {
-  border-left: 3px solid var(--kb-priority-high);
+  border-inline-start: 3px solid var(--kb-priority-high);
 }
 .card.kb-pri-medium {
-  border-left: 3px solid var(--kb-priority-medium);
+  border-inline-start: 3px solid var(--kb-priority-medium);
 }
 .card.kb-pri-low {
-  border-left: 3px solid var(--kb-priority-low);
+  border-inline-start: 3px solid var(--kb-priority-low);
 }
 
 /* Card Header */
@@ -457,7 +478,7 @@
 .card-title {
   font-size: 0.95rem;
   margin: 0;
-  padding-right: 4rem; /* Space for action buttons */
+  padding-inline-end: 4rem; /* Space for action buttons */
   font-weight: 500;
   word-break: break-word; /* Break long words */
   overflow-wrap: break-word; /* Handle overflow */
@@ -474,7 +495,7 @@
 .card-actions {
   position: absolute;
   top: 0.75rem;
-  right: 0.75rem;
+  inset-inline-end: 0.75rem;
   display: flex;
   gap: 0.4rem;
   opacity: 0;
@@ -566,7 +587,7 @@
 .detail-label {
   font-weight: 600;
   color: var(--muted-text);
-  margin-right: 0.5rem;
+  margin-inline-end: 0.5rem;
 }
 
 .detail-value {
@@ -679,7 +700,7 @@
 }
 
 .add-card span {
-  margin-right: 0.5rem;
+  margin-inline-end: 0.5rem;
   font-size: 1.2rem;
 }
 
@@ -781,7 +802,7 @@
   font-size: 0.9rem;
   font-weight: 500;
   color: #333;
-  border-left: 4px solid var(--accent-color);
+  border-inline-start: 4px solid var(--accent-color);
 }
 
 /* Custom scrollbar */
@@ -860,7 +881,7 @@
   }
   
   .clear-filters {
-    margin-left: 0;
+    margin-inline-start: 0;
     align-self: flex-end;
   }
 }
@@ -1200,7 +1221,7 @@
 .bulk-count {
   font-weight: 700;
   font-size: 13px;
-  padding-right: 4px;
+  padding-inline-end: 4px;
 }
 .bulk-move-label {
   font-size: 12px;
@@ -1309,7 +1330,7 @@
   padding: 8px 10px;
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-left: 3px solid #ef4444;
+  border-inline-start: 3px solid #ef4444;
   border-radius: 8px;
   box-shadow: 0 2px 8px var(--shadow-color);
   font-size: 13px;
@@ -1395,4 +1416,383 @@
 
 .undo-toast-button:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* =========================================================================
+   3.0 additions: add-card button, animations, custom priorities, due dates,
+   column collapse / management, load-more, card details panel.
+   ========================================================================= */
+
+/* The add-card control is a real <button> (keyboard + screen-reader friendly). */
+button.add-card {
+  width: 100%;
+  font: inherit;
+  font-weight: 600;
+  gap: 0.4rem;
+}
+.add-card svg {
+  flex-shrink: 0;
+}
+
+@keyframes kb-expand-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kb-pop-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.kb-expand-in { animation: kb-expand-in 0.22s ease-out; }
+.kb-pop-in { animation: kb-pop-in 0.18s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .kb-expand-in, .kb-pop-in, .kb-details-panel { animation: none !important; }
+}
+
+/* Custom priorities: colour comes from the --kb-pri-color variable. */
+.card.kb-pri-custom {
+  border-inline-start: 3px solid var(--kb-pri-color);
+}
+.priority-badge.custom {
+  color: var(--kb-pri-color);
+  background: color-mix(in srgb, var(--kb-pri-color) 14%, transparent);
+}
+.priority-badge-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Due-date chip (overdue / due today / due soon). */
+.kb-due-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+.kb-due-chip.overdue,
+.kb-due-chip.today {
+  color: var(--kb-due-overdue);
+  background: var(--kb-due-overdue-bg);
+}
+.kb-due-chip.soon {
+  color: var(--kb-due-soon);
+  background: var(--kb-due-soon-bg);
+}
+.card.kb-due-overdue {
+  box-shadow: var(--kb-shadow), inset 0 0 0 1px color-mix(in srgb, var(--kb-due-overdue) 35%, transparent);
+}
+
+.card-action-button.open:hover {
+  color: var(--kb-accent);
+}
+
+/* Column header extras */
+.column-title-custom {
+  flex: 1;
+  min-width: 0;
+}
+.column-counter-container {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.column-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.16);
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.column-action:hover,
+.column-action:focus-visible {
+  background: rgba(0, 0, 0, 0.28);
+}
+.column-action svg {
+  width: 14px;
+  height: 14px;
+}
+.column-manage-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.kanban-column:hover .column-manage-actions,
+.column-title:focus-within .column-manage-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .column-manage-actions { opacity: 1; }
+}
+.column-rename-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 1rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.95);
+  color: #1a1a1a;
+}
+.column-delete-confirm {
+  margin: 0.6rem 0.75rem 0;
+}
+
+/* Collapsed column: a narrow strip that still accepts drops. */
+.kanban-column.collapsed {
+  width: 52px;
+  min-width: 52px;
+  align-self: stretch;
+  max-height: none;
+}
+.collapsed-column-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 220px;
+  height: 100%;
+  padding: 0.8rem 0;
+  border: none;
+  background-color: var(--kb-column-header-bg);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.collapsed-column-title {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+.collapsed-column-count {
+  font-size: 0.78rem;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+/* Load more */
+.kb-load-more {
+  width: 100%;
+  padding: 0.55rem;
+  margin-top: 0.25rem;
+  border: 1px dashed var(--kb-border);
+  border-radius: var(--kb-radius-sm);
+  background: transparent;
+  color: var(--kb-text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.kb-load-more:hover:not(:disabled) {
+  color: var(--kb-accent);
+  border-color: var(--kb-accent);
+}
+.kb-load-more:disabled {
+  cursor: progress;
+}
+
+/* Add column tile */
+.kb-add-column {
+  width: 280px;
+  min-width: 280px;
+}
+.kb-add-column-button {
+  width: 100%;
+  padding: 0.9rem;
+  border: 2px dashed var(--kb-border);
+  border-radius: var(--kb-radius);
+  background: transparent;
+  color: var(--kb-text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kb-add-column-button:hover {
+  color: var(--kb-accent);
+  border-color: var(--kb-accent);
+}
+.kb-add-column-form {
+  background: var(--kb-elevated-bg);
+  border-radius: var(--kb-radius);
+  padding: 0.75rem;
+  box-shadow: var(--kb-shadow-hover);
+}
+.kb-add-column-form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--kb-border);
+  border-radius: var(--kb-radius-sm);
+  background: var(--kb-card-bg);
+  color: var(--kb-text);
+  font: inherit;
+}
+
+/* Card details panel */
+.kb-details-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--kb-backdrop);
+  display: flex;
+  justify-content: flex-end;
+}
+@keyframes kb-panel-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+[dir="rtl"] .kb-details-backdrop { justify-content: flex-start; }
+.kb-details-panel {
+  width: min(460px, 100vw);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--kb-elevated-bg);
+  color: var(--kb-text);
+  font-family: var(--kb-font);
+  box-shadow: -12px 0 32px -12px var(--kb-shadow-color);
+  display: flex;
+  flex-direction: column;
+  animation: kb-panel-in 0.2s ease-out;
+  outline: none;
+}
+.kb-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--kb-border);
+  position: sticky;
+  top: 0;
+  background: inherit;
+  z-index: 1;
+}
+.kb-details-heading {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.kb-details-close {
+  border: none;
+  background: transparent;
+  color: var(--kb-text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+.kb-details-close:hover {
+  background: var(--kb-hover-bg);
+  color: var(--kb-text);
+}
+.kb-details-body {
+  padding: 1.1rem 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.kb-details-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.kb-details-field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--kb-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.kb-details-field input,
+.kb-details-field textarea,
+.kb-details-field select {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--kb-radius-sm);
+  border: 1px solid var(--kb-border);
+  background: var(--kb-card-bg);
+  color: var(--kb-text);
+  box-sizing: border-box;
+  width: 100%;
+}
+.kb-details-field textarea {
+  resize: vertical;
+}
+.kb-details-field input:focus,
+.kb-details-field textarea:focus,
+.kb-details-field select:focus {
+  outline: 2px solid color-mix(in srgb, var(--kb-accent) 45%, transparent);
+  border-color: var(--kb-accent);
+}
+.kb-details-extra {
+  border-top: 1px solid var(--kb-border);
+  padding-top: 0.9rem;
+}
+.kb-details-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+.kb-details-spacer {
+  flex: 1;
+}
+.kb-details-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+}
+.kb-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--kb-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.kb-btn.primary {
+  background: var(--kb-accent);
+  color: white;
+}
+.kb-btn.primary:hover {
+  filter: brightness(1.08);
+}
+.kb-btn.ghost {
+  background: transparent;
+  border-color: var(--kb-border);
+  color: var(--kb-text);
+}
+.kb-btn.ghost:hover {
+  background: var(--kb-hover-bg);
+}
+.kb-btn.danger {
+  background: var(--kb-priority-high);
+  color: white;
+}
+.kb-btn.danger-text {
+  color: var(--kb-priority-high);
+}
+
+/* RTL: the drag overlay inherits direction from the board. */
+[dir="rtl"] .kanban-board,
+[dir="rtl"] .kanban-search {
+  direction: rtl;
 }

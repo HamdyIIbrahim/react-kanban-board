@@ -147,7 +147,10 @@ export function columnOrder(page: Page, columnKey: string): Promise<string[]> {
 }
 
 export interface ConsoleCapture {
+  // onCardMove (cross-column) and onCardReorder (same column) payloads.
   moves: any[];
+  // Only the onCardReorder payloads.
+  reorders: any[];
   deletes: string[];
   changes: string[];
   columns: string[];
@@ -161,6 +164,7 @@ export interface ConsoleCapture {
 export function captureConsole(page: Page): ConsoleCapture {
   const cap: ConsoleCapture = {
     moves: [],
+    reorders: [],
     deletes: [],
     changes: [],
     columns: [],
@@ -168,12 +172,15 @@ export function captureConsole(page: Page): ConsoleCapture {
   };
   page.on("console", async (msg) => {
     const text = msg.text();
-    if (text.startsWith("onCardMove:")) {
+    if (text.startsWith("onCardMove:") || text.startsWith("onCardReorder:")) {
+      let payload: any;
       try {
-        cap.moves.push(await msg.args()[1].jsonValue());
+        payload = await msg.args()[1].jsonValue();
       } catch {
-        cap.moves.push(text);
+        payload = text;
       }
+      cap.moves.push(payload);
+      if (text.startsWith("onCardReorder:")) cap.reorders.push(payload);
     } else if (text.startsWith("onCardDelete:")) {
       cap.deletes.push(text.replace("onCardDelete:", "").trim());
     } else if (text.startsWith("onCardsChange:")) {

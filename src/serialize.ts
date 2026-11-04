@@ -3,13 +3,13 @@
  * dnd-kit dependencies, so they can be used anywhere (browser or server) and
  * unit-tested in isolation.
  */
-import type { Card, CardFieldDef } from "./index";
+import type { BaseCard, Card, CardFieldDef } from "./types";
 
 /**
  * Validate a card against a custom field schema. Returns an array of
  * human-readable error messages (empty when valid).
  */
-export function validateCard(card: Card, fields: CardFieldDef[]): string[] {
+export function validateCard(card: BaseCard, fields: CardFieldDef[]): string[] {
   const errors: string[] = [];
   for (const f of fields) {
     const v = (card as any)[f.key];
@@ -47,7 +47,7 @@ const CORE_FIELDS = [
 ] as const;
 
 /** Serialize cards to pretty-printed JSON. */
-export function exportCardsToJSON(cards: Card[]): string {
+export function exportCardsToJSON(cards: BaseCard[]): string {
   return JSON.stringify(cards, null, 2);
 }
 
@@ -84,7 +84,7 @@ const cellToString = (v: unknown): string => {
 };
 
 /** Serialize cards to CSV. Array fields (e.g. tags) are joined with `|`. */
-export function exportCardsToCSV(cards: Card[]): string {
+export function exportCardsToCSV(cards: BaseCard[]): string {
   const extra = new Set<string>();
   for (const card of cards) {
     for (const key of Object.keys(card)) {

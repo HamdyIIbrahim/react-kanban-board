@@ -1,5 +1,5 @@
 /* =========================================================================
-   react-custom-kanban-board — v3 playground chrome
+   react-custom-kanban-board — playground chrome
    Aesthetic: editorial-tech. Dark ink shell, characterful Fraunces display,
    a single electric-lime signal color, the board floating on a bright canvas.
    ========================================================================= */
@@ -835,4 +835,17 @@ body {
   .stat {
     margin-left: 0;
   }
+}
+
+/* Icons inside console buttons */
+.btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

@@ -25,7 +25,6 @@ yarn-error.log*
 # Dependency directories
 /pnpm-lock.yaml
 /pnpm-store/
-package-lock.json
 yarn.lock
 
 # IDE and editor directories
@@ -73,3 +72,9 @@ Thumbs.db
 
 # Windows specific files
 Thumbs.db
+
+# Demo build
+/demo-dist/
+
+# README example check (generated)
+/.readme-examples/
