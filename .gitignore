@@ -63,6 +63,8 @@ Thumbs.db
 
 # Build artifacts
 *.d.ts
+# ...but keep hand-written declarations in the source tree
+!src/**/*.d.ts
 
 # Yarn
 .yarn/
